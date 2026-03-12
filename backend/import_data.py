@@ -15,8 +15,10 @@ def import_data():
         try:
             # Loaddata into the database
             call_command('loaddata', file_path)
-            print("✅ Data imported successfully!")
-            # Optionally rename the file so it doesn't run again or skip it
+            
+            from assessment.models import Student, CustomUser, Subject
+            print(f"✅ Data imported successfully!")
+            print(f"📊 Live counts now: {CustomUser.objects.count()} Users, {Student.objects.count()} Students, {Subject.objects.count()} Subjects.")
         except Exception as e:
             print(f"❌ Error during import: {e}")
     else:
