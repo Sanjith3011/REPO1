@@ -177,7 +177,9 @@ export default function ManageTeachers() {
             {/* Navbar */}
             <nav className="navbar">
                 <div className="navbar-brand">
-                    <img src="/logo.png" alt="Logo" style={{ height: 42, width: 42, objectFit: 'contain' }} />
+                    <div className="nav-logo-box">
+                        <img src="/logo.png" alt="Logo" className="nav-logo-img" />
+                    </div>
                     <div>
                         <h1>Jai Shriram Engineering College</h1>
                         <small>Admin Portal - Manage Teachers</small>
