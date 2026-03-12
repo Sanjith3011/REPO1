@@ -45,7 +45,9 @@ export default function Login() {
     return (
         <div className="login-page">
             <div className="login-box">
-                <div className="login-logo">JS</div>
+                <div className="login-logo-container">
+                    <img src="/src/assets/logo.png" alt="College Logo" className="login-image-logo" />
+                </div>
                 <h2>JAI SHRIRAM ENGINEERING<br />COLLEGE</h2>
                 <p>Internal Assessment Marks Management System</p>
 
@@ -131,7 +133,7 @@ export default function Login() {
                     Admin → <code>admin / admin123</code><br />
                     Teacher → <code>teacher1 / pass123</code><br />
                     Student → <code>John Doe / 711221104001</code><br /><br />
-                    (An Autonomous Institution) - Avinashipalayam, Tiruppur<br />
+                    (An Autonomous Institution) - Tiruppur<br />
                     Approved by AICTE - Affiliated to Anna University
                 </div>
             </div>

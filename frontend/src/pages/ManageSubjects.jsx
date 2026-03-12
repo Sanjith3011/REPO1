@@ -266,10 +266,10 @@ export default function ManageSubjects() {
             {/* Navbar */}
             <nav className="navbar">
                 <div className="navbar-brand">
-                    <div className="logo-icon">🎓</div>
+                    <img src="/src/assets/logo.png" alt="Logo" style={{ height: 42, width: 42, objectFit: 'contain' }} />
                     <div>
-                        <h1>Assessment System</h1>
-                        <small>Manage Subjects</small>
+                        <h1>Jai Shriram Engineering College</h1>
+                        <small>Admin Portal - Manage Subjects</small>
                     </div>
                 </div>
                 <div className="navbar-right">

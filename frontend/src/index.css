@@ -529,19 +529,23 @@ select.form-control {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
 }
 
-.login-logo {
-  width: 60px;
-  height: 60px;
-  background: linear-gradient(180deg, #ff9f00, #f57f17);
-  border-radius: 14px;
+.login-logo-container {
+  width: 100px;
+  height: 100px;
+  background: white;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
-  font-weight: 800;
-  color: white;
   margin: 0 auto 20px;
-  box-shadow: 0 4px 12px rgba(255, 153, 0, 0.3);
+  padding: 5px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.login-image-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .login-box h2 {
