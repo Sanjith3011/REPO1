@@ -8,6 +8,8 @@ urlpatterns = [
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/me/', views.current_user, name='current_user'),
     path('auth/change-password/', views.change_own_password, name='change_own_password'),
+    path('auth/health/', views.health_check, name='health_check'),
+
 
     # Reference data
     path('departments/', views.department_list, name='departments'),

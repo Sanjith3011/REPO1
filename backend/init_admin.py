@@ -11,19 +11,31 @@ def create_admin():
     username = 'admin'
     password = 'admin123'
     
-    if not CustomUser.objects.filter(username=username).exists():
-        print(f"Creating default admin: {username}")
-        CustomUser.objects.create_superuser(
-            username=username,
-            password=password,
-            email='admin@example.com',
-            first_name='System',
-            last_name='Admin',
-            role='admin'
-        )
-        print("Admin created successfully!")
+    # Use find or create logic
+    user, created = CustomUser.objects.get_or_create(
+        username=username,
+        defaults={
+            'email': 'admin@example.com',
+            'first_name': 'System',
+            'last_name': 'Admin',
+            'role': 'admin',
+            'is_staff': True,
+            'is_superuser': True
+        }
+    )
+    
+    if created:
+        user.set_password(password)
+        user.save()
+        print(f"✅ Successfully created default admin: {username}")
     else:
-        print("Admin already exists. Skipping creation.")
+        # Update existing user to be admin if needed
+        user.role = 'admin'
+        user.is_staff = True
+        user.is_superuser = True
+        user.set_password(password) # Ensure password is reset to admin123
+        user.save()
+        print(f"ℹ️ Admin '{username}' already exists. Password reset to '{password}'.")
 
 if __name__ == '__main__':
     create_admin()
