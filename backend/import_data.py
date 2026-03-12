@@ -9,6 +9,12 @@ django.setup()
 from django.core.management import call_command
 from assessment.models import CustomUser
 
+def log_message(msg):
+    log_file = os.path.join(os.path.dirname(__file__), 'migration.log')
+    print(msg)
+    with open(log_file, 'a', encoding='utf-8') as f:
+        f.write(msg + '\n')
+
 def import_data():
     # Try multiple possible paths for the data file
     possible_paths = [
@@ -24,33 +30,31 @@ def import_data():
             break
             
     if file_path:
-        print(f"📦 Found data file at: {file_path}. Starting import...")
+        log_message(f"📦 Found data file at: {file_path}. Starting import...")
         try:
-            # IMPORTANT: Delete the temporary admin to avoid unique constraint conflicts
-            # loaddata will import the real admin from the JSON file
+            # Delete the temporary admin to avoid unique constraint conflicts
             CustomUser.objects.filter(username='admin').delete()
-            print("🧹 Removed temporary admin to prevent conflicts.")
+            log_message("🧹 Removed temporary admin to prevent conflicts.")
             
             # Loaddata into the database
             call_command('loaddata', file_path)
             
             from assessment.models import Student, CustomUser, Subject, Department
-            print(f"✅ Data imported successfully from {file_path}!")
-            print(f"📊 Live counts now:")
-            print(f"   - Users: {CustomUser.objects.count()}")
-            print(f"   - Students: {Student.objects.count()}")
-            print(f"   - Teachers: {CustomUser.objects.filter(role='teacher').count()}")
-            print(f"   - Subjects: {Subject.objects.count()}")
-            print(f"   - Departments: {Department.objects.count()}")
+            log_message(f"✅ Data imported successfully from {file_path}!")
+            log_message(f"📊 Counts: Users:{CustomUser.objects.count()}, Students:{Student.objects.count()}, Subjects:{Subject.objects.count()}")
             
         except Exception as e:
-            print(f"❌ ERROR while importing data: {str(e)}")
+            log_message(f"❌ ERROR while importing data: {str(e)}")
             # Re-create admin if it was deleted and import failed
             if not CustomUser.objects.filter(username='admin').exists():
                  CustomUser.objects.create_superuser('admin', 'admin@example.com', 'admin123', role='admin')
-                 print("⚠️ Re-created emergency admin after failed import.")
+                 log_message("⚠️ Re-created emergency admin.")
     else:
-        print(f"ℹ️ No data.json found. Checked paths: {possible_paths}")
+        log_message(f"ℹ️ No data.json found. Checked: {possible_paths}")
 
 if __name__ == '__main__':
+    # Clear log on start
+    log_file = os.path.join(os.path.dirname(__file__), 'migration.log')
+    if os.path.exists(log_file):
+        os.remove(log_file)
     import_data()
