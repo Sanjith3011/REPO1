@@ -1,0 +1,16 @@
+[
+  {
+    "username": "teacher1",
+    "active": true,
+    "hash_start": "pbkdf2_sha256$120000",
+    "check_pass123": true,
+    "check_teacher123": false
+  },
+  {
+    "username": "teacher2",
+    "active": true,
+    "hash_start": "pbkdf2_sha256$120000",
+    "check_pass123": false,
+    "check_teacher123": false
+  }
+]
