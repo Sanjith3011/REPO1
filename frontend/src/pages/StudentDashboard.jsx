@@ -45,7 +45,7 @@ function Navbar({ user, onLogout }) {
         <>
             <nav className="navbar">
                 <div className="navbar-brand">
-                    <img src="/src/assets/logo.png" alt="Logo" style={{ height: 42, width: 42, objectFit: 'contain' }} />
+                    <img src="/logo.png" alt="Logo" style={{ height: 42, width: 42, objectFit: 'contain' }} />
                     <div>
                         <h1>Jai Shriram Engineering College</h1>
                         <small>Student Performance Dashboard</small>

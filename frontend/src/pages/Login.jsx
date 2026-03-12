@@ -46,7 +46,7 @@ export default function Login() {
         <div className="login-page">
             <div className="login-box">
                 <div className="login-logo-container">
-                    <img src="/src/assets/logo.png" alt="College Logo" className="login-image-logo" />
+                    <img src="/logo.png" alt="College Logo" className="login-image-logo" />
                 </div>
                 <h2>JAI SHRIRAM ENGINEERING<br />COLLEGE</h2>
                 <p>Internal Assessment Marks Management System</p>
