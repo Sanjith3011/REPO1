@@ -1,6 +1,7 @@
 import os
 import django
 import sys
+import traceback
 
 # Set up Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
@@ -49,7 +50,9 @@ def import_data():
             log_message(f"   - Departments: {Department.objects.count()}")
             
         except Exception as e:
+            error_trace = traceback.format_exc()
             log_message(f"❌ ERROR while importing data: {str(e)}")
+            log_message(f"🔍 Traceback:\n{error_trace}")
             # Re-create admin if it was deleted and import failed
             if not CustomUser.objects.filter(username='admin').exists():
                  CustomUser.objects.create_superuser('admin', 'admin@example.com', 'admin123', role='admin')

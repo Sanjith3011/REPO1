@@ -928,9 +928,9 @@ def health_check(request):
         log_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'migration.log')
         if os.path.exists(log_file):
             with open(log_file, 'r', encoding='utf-8') as f:
-                # Only return the last 1000 characters to keep response clean
+                # Return more of the log to see the full error
                 content = f.read()
-                data['migration_log'] = content[-2000:]
+                data['migration_log'] = content[-10000:]
     except Exception as e:
         data['migration_log'] = f"Error reading log: {str(e)}"
 
