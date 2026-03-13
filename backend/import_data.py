@@ -33,6 +33,17 @@ def import_data():
     if file_path:
         log_message(f"📦 Found data file at: {file_path}. Starting import...")
         try:
+            # DEFENSIVE: Check for UTF-8 BOM and strip it if necessary
+            with open(file_path, 'rb') as f:
+                raw_data = f.read()
+            
+            if raw_data.startswith(b'\xef\xbb\xbf'):
+                log_message("⚠️ Detected UTF-8 BOM. Stripping it for safe import...")
+                clean_data = raw_data.decode('utf-8-sig').encode('utf-8')
+                with open(file_path, 'wb') as f:
+                    f.write(clean_data)
+                log_message("✅ BOM stripped successfully.")
+
             # Delete the temporary admin to avoid unique constraint conflicts
             # loaddata will import the real admin from the JSON file
             CustomUser.objects.filter(username='admin').delete()
