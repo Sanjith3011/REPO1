@@ -446,20 +446,24 @@ export default function TeacherDashboard() {
         }
     }
 
-    const handleExportPDF = () => {
-        const params = new URLSearchParams(filter).toString()
-        const token = localStorage.getItem('access_token')
-        // Open in new tab — browser handles download
-        const url = `/api/marks/export-pdf/?${params}`
-        fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-            .then(r => r.blob())
-            .then(blob => {
-                const a = document.createElement('a')
-                a.href = URL.createObjectURL(blob)
-                a.download = `assessment_${filter.assessment_type}.pdf`
-                a.click()
+    const handleExportPDF = async () => {
+        try {
+            const params = new URLSearchParams(filter).toString()
+            const response = await api.get(`/marks/export-pdf/?${params}`, {
+                responseType: 'blob'
             })
-            .catch(() => showToast('PDF generation failed', 'error'))
+            
+            const url = window.URL.createObjectURL(new Blob([response.data]))
+            const link = document.createElement('a')
+            link.href = url
+            link.setAttribute('download', `assessment_${filter.assessment_type}.pdf`)
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            window.URL.revokeObjectURL(url)
+        } catch (err) {
+            showToast('PDF generation failed', 'error')
+        }
     }
 
     const cs = showTable ? getClassSummary() : null
