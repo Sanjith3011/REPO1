@@ -908,16 +908,8 @@ def health_check(request):
     from .models import CustomUser
     count = CustomUser.objects.count()
     admins = CustomUser.objects.filter(role='admin').count()
-    
-    log_content = ""
-    log_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'migration.log')
-    if os.path.exists(log_file):
-        with open(log_file, 'r') as f:
-            log_content = f.read()
-            
     return Response({
         'status': 'ok',
         'total_users': count,
         'admin_users': admins,
-        'migration_log': log_content
     })
