@@ -905,11 +905,33 @@ def student_own_marks(request):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def health_check(request):
-    from .models import CustomUser
-    count = CustomUser.objects.count()
-    admins = CustomUser.objects.filter(role='admin').count()
-    return Response({
-        'status': 'ok',
-        'total_users': count,
-        'admin_users': admins,
-    })
+    data = {
+        'status': 'error',
+        'database': 'unknown',
+        'error': None,
+        'total_users': 0,
+        'admin_users': 0,
+        'migration_log': 'not found'
+    }
+    
+    try:
+        from .models import CustomUser
+        data['total_users'] = CustomUser.objects.count()
+        data['admin_users'] = CustomUser.objects.filter(role='admin').count()
+        data['database'] = 'connected'
+        data['status'] = 'ok'
+    except Exception as e:
+        data['error'] = str(e)
+        data['database'] = 'failed'
+
+    try:
+        log_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'migration.log')
+        if os.path.exists(log_file):
+            with open(log_file, 'r', encoding='utf-8') as f:
+                # Only return the last 1000 characters to keep response clean
+                content = f.read()
+                data['migration_log'] = content[-2000:]
+    except Exception as e:
+        data['migration_log'] = f"Error reading log: {str(e)}"
+
+    return Response(data)
