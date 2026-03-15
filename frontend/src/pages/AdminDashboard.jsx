@@ -144,6 +144,12 @@ export default function AdminDashboard() {
                                 <div className="label">Manage Subjects & Assignments</div>
                             </div>
                         </Link>
+                        <Link to="/admin/marks" style={{ textDecoration: 'none' }}>
+                            <div className="analysis-card" style={{ background: '#e0f7fa', borderColor: '#b2ebf2', color: '#006064' }}>
+                                <div className="value" style={{ fontSize: 40 }}>📊</div>
+                                <div className="label">View Marks & Reports</div>
+                            </div>
+                        </Link>
                     </div>
                 </div>
             </div>

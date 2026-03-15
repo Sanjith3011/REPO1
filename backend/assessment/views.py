@@ -13,7 +13,7 @@ from .serializers import (
     UserSerializer, DepartmentSerializer, BatchSerializer,
     SubjectSerializer, StudentSerializer, MarkSerializer, UserCreateSerializer
 )
-from .permissions import IsTeacher, IsStudent, IsAdmin
+from .permissions import IsTeacher, IsStudent, IsAdmin, IsAdminOrTeacher
 from .pdf_generator import generate_marks_pdf
 
 
@@ -813,7 +813,7 @@ def marks_summary(request):
 # PDF Export
 # ──────────────────────────────
 @api_view(['GET'])
-@permission_classes([IsTeacher])
+@permission_classes([IsAdminOrTeacher])
 def export_pdf(request):
     batch_id = request.query_params.get('batch')
     dept_id = request.query_params.get('department')

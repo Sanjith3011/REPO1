@@ -9,6 +9,7 @@ import ManageSubjects from './pages/ManageSubjects'
 
 import AdminDashboard from './pages/AdminDashboard'
 import ManageTeachers from './pages/ManageTeachers'
+import AdminMarksView from './pages/AdminMarksView'
 
 function ProtectedRoute({ children, role }) {
     const { user, loading } = useAuth()
@@ -38,6 +39,7 @@ function AppRoutes() {
             <Route path="/admin/teachers" element={<ProtectedRoute role="admin"><ManageTeachers /></ProtectedRoute>} />
             <Route path="/admin/students" element={<ProtectedRoute role="admin"><ManageStudents /></ProtectedRoute>} />
             <Route path="/admin/subjects" element={<ProtectedRoute role="admin"><ManageSubjects /></ProtectedRoute>} />
+            <Route path="/admin/marks" element={<ProtectedRoute role="admin"><AdminMarksView /></ProtectedRoute>} />
 
             {/* Teacher Routes */}
             <Route path="/teacher" element={<ProtectedRoute role="teacher"><TeacherDashboard /></ProtectedRoute>} />

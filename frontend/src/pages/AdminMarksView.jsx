@@ -63,11 +63,11 @@ function Navbar({ user, onLogout }) {
                         onClick={() => setShowProfileMenu(!showProfileMenu)} 
                         style={{ cursor: 'pointer', position: 'relative' }}
                     >
-                        <div className="avatar">{user?.first_name?.[0] || 'T'}</div>
+                        <div className="avatar">{user?.first_name?.[0] || 'A'}</div>
                         <div>
                             <div style={{ fontWeight: 600, fontSize: 13 }}>{user?.first_name} {user?.last_name}</div>
                             <span className="role-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                Teacher <span style={{ fontSize: 10 }}>▼</span>
+                                Admin <span style={{ fontSize: 10 }}>▼</span>
                             </span>
                         </div>
                         
@@ -164,7 +164,7 @@ function Toast({ message, type, onClose }) {
     return <div className={`toast ${type}`}>{message}</div>
 }
 
-export default function TeacherDashboard() {
+export default function AdminMarksView() {
     const { user, logout } = useAuth()
 
     // Filter state
@@ -177,7 +177,6 @@ export default function TeacherDashboard() {
     const [students, setStudents] = useState([])   // [{student_id, roll_no, name, marks:{subj_id:{value,is_absent}}}]
     const [localMarks, setLocalMarks] = useState({}) // {`${student_id}_${subject_id}`: string}
     const [loadingMarks, setLoadingMarks] = useState(false)
-    const [saving, setSaving] = useState(false)
     const [showTable, setShowTable] = useState(false)
     const [showGraph, setShowGraph] = useState(false)
 
@@ -300,22 +299,6 @@ export default function TeacherDashboard() {
         
         setLocalMarks(nextMarks)
         setCustomMax(newMax)
-        showToast(`Marks scaled to out of ${newMax}`)
-    }
-
-    const handleMarkChange = (student_id, subject_id, val) => {
-        const key = `${student_id}_${subject_id}`
-        const upperVal = val.toUpperCase()
-        if (upperVal !== '' && upperVal !== 'A' && upperVal !== 'AB') {
-            const num = parseFloat(upperVal)
-            // Strict 0-100 logic (allows decimals if user types them, e.g. 10.5)
-            // But we first check if it's a completely invalid string
-            const isInvalidText = !/^\d*\.?\d*$/.test(upperVal)
-            if (isNaN(num) || num < 0 || num > 100 || isInvalidText) {
-                return // reject invalid input
-            }
-        }
-        setLocalMarks(m => ({ ...m, [key]: upperVal }))
     }
 
     // Per-student stats
@@ -415,47 +398,6 @@ export default function TeacherDashboard() {
         return { total: students.length, attended, pass: passStudents, fail: failStudents, pct, arrear1, arrear2, arrear3plus }
     }
 
-    const handleSave = async () => {
-        setSaving(true)
-        try {
-            const standardMax = getAssessmentMax()
-            const payload = []
-            
-            for (const st of students) {
-                for (const subj of subjects) {
-                    const key = `${st.student_id}_${subj.id}`
-                    const val = localMarks[key]
-                    if (val === undefined || val === 'N/A') continue
-                    const isAbsent = val === 'AB'
-                    
-                    let finalMark = null
-                    if (!isAbsent && val !== '') {
-                        const num = parseFloat(val)
-                        // Scale back to standard max before submitting
-                        // Formula: Db Mark = (Custom Mark / Custom Max) * Standard Max
-                        let dbScaled = (num / customMax) * standardMax
-                        dbScaled = Math.round(dbScaled * 10) / 10
-                        finalMark = dbScaled
-                    }
-                    
-                    payload.push({
-                        student_id: st.student_id,
-                        subject_id: subj.id,
-                        assessment_type: filter.assessment_type,
-                        marks: finalMark,
-                        is_absent: isAbsent,
-                    })
-                }
-            }
-            await api.post('/marks/save/', payload)
-            showToast('✅ Marks saved successfully!')
-        } catch {
-            showToast('❌ Failed to save marks', 'error')
-        } finally {
-            setSaving(false)
-        }
-    }
-
     const handleExportPDF = async () => {
         try {
             const params = new URLSearchParams(filter).toString()
@@ -484,6 +426,11 @@ export default function TeacherDashboard() {
             <Navbar user={user} onLogout={logout} />
             <div className="page-wrapper">
                 <div className="container">
+                    <div style={{ marginBottom: 16 }}>
+                        <Link to="/admin" className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+                            <span>←</span> Back to Dashboard
+                        </Link>
+                    </div>
 
                     {/* ── Selection Panel ── */}
                     <div className="selection-panel">
@@ -598,11 +545,6 @@ export default function TeacherDashboard() {
                                     <button className={`btn ${showGraph ? 'btn-primary' : 'btn-outline'}`} onClick={() => setShowGraph(true)}>
                                         📈 Graph View
                                     </button>
-                                    {!showGraph && (
-                                        <button id="save-marks-btn" className="btn btn-primary" onClick={handleSave} disabled={saving}>
-                                            {saving ? 'Saving...' : '💾 Save Marks'}
-                                        </button>
-                                    )}
                                     <button id="export-pdf-btn" className="btn btn-accent" onClick={handleExportPDF}>
                                         📄 Export PDF
                                     </button>
@@ -788,25 +730,9 @@ export default function TeacherDashboard() {
                                                                 {val === 'N/A' ? (
                                                                     <span style={{ color: 'var(--text-muted)', fontSize: 13, userSelect: 'none' }}>—</span>
                                                                 ) : (
-                                                                    <input
-                                                                        className={`mark-input ${cls}`}
-                                                                        type="text"
-                                                                        id={`mark-${st.student_id}-${subj.id}`}
-                                                                        value={val}
-                                                                        onChange={e => handleMarkChange(st.student_id, subj.id, e.target.value)}
-                                                                        placeholder="—"
-                                                                        maxLength={5}
-                                                                        onKeyDown={e => {
-                                                                            if (e.key === 'Enter') {
-                                                                                e.preventDefault()
-                                                                                const nextStudent = students[idx + 1]
-                                                                                if (nextStudent) {
-                                                                                    const next = document.getElementById(`mark-${nextStudent.student_id}-${subj.id}`)
-                                                                                    if (next) { next.focus(); next.select() }
-                                                                                }
-                                                                            }
-                                                                        }}
-                                                                    />
+                                                                    <div className={`mark-input ${cls}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '38px', background: 'transparent', cursor: 'default' }}>
+                                                                        {val || '—'}
+                                                                    </div>
                                                                 )}
                                                             </td>
                                                         )
