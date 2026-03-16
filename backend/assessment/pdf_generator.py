@@ -1,9 +1,12 @@
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable, KeepTogether
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.charts.barcharts import VerticalBarChart
+from reportlab.graphics.charts.legends import Legend
 import io
 
 
@@ -418,6 +421,105 @@ def generate_marks_pdf(context):
         ('TEXTCOLOR',     (3, 1), (3, -1), colors.HexColor('#b71c1c')),   # Fail col red
     ]))
     story.append(dist_table)
+
+    # ════════════════════════════════════════════════════════
+    # GRAPHS
+    # ════════════════════════════════════════════════════════
+    story.append(Spacer(1, 1 * cm))
+
+    # Pass Percentage Chart
+    pass_pct_data = []
+    subject_names = []
+    for ss in context['subject_summary']:
+        pass_pct_data.append(ss['pass_pct'])
+        subject_names.append(ss['code'])
+
+    if pass_pct_data:
+        d = Drawing(600, 200)
+        chart = VerticalBarChart()
+        chart.width = 500
+        chart.height = 130
+        chart.x = 50
+        chart.y = 40
+        chart.data = [pass_pct_data]
+        chart.categoryAxis.categoryNames = subject_names
+        chart.categoryAxis.labels.boxAnchor = 'ne'
+        chart.categoryAxis.labels.dx = 0
+        chart.categoryAxis.labels.dy = -2
+        chart.categoryAxis.labels.angle = 0
+        chart.valueAxis.valueMin = 0
+        chart.valueAxis.valueMax = 100
+        chart.valueAxis.valueStep = 20
+        chart.bars[0].fillColor = colors.HexColor('#256329') # pass color
+
+        d.add(chart)
+        story.append(KeepTogether([
+            Paragraph("Subject-wise Pass Percentage", section_style),
+            d
+        ]))
+
+    # Mark Distribution Chart
+    dist_data = [[], [], [], [], [], []]
+    series_names = ['Fail', '50-59%', '60-69%', '70-79%', '80-89%', '90-100%']
+    series_colors = [
+        colors.HexColor('#b71c1c'), # Fail
+        colors.HexColor('#ff9800'), # 50-59
+        colors.HexColor('#ffeb3b'), # 60-69
+        colors.HexColor('#4caf50'), # 70-79
+        colors.HexColor('#2196f3'), # 80-89
+        colors.HexColor('#3f51b5')  # 90-100
+    ]
+
+    for ss in context['subject_summary']:
+        dist_data[0].append(ss.get('fail', 0))
+        dist_data[1].append(ss.get('r50_60', 0))
+        dist_data[2].append(ss.get('r60_70', 0))
+        dist_data[3].append(ss.get('r70_80', 0))
+        dist_data[4].append(ss.get('r80_90', 0))
+        dist_data[5].append(ss.get('r90_100', 0))
+
+    if pass_pct_data:
+        story.append(Spacer(1, 0.5 * cm))
+        d_dist = Drawing(600, 220)
+        chart_dist = VerticalBarChart()
+        chart_dist.width = 450
+        chart_dist.height = 130
+        chart_dist.x = 50
+        chart_dist.y = 40
+        chart_dist.data = dist_data
+        chart_dist.categoryAxis.categoryNames = subject_names
+        chart_dist.categoryAxis.labels.boxAnchor = 'ne'
+        chart_dist.categoryAxis.labels.dx = 0
+        chart_dist.categoryAxis.labels.dy = -2
+        chart_dist.categoryAxis.labels.angle = 0
+        
+        max_val = max([max(s) for s in dist_data]) if dist_data and dist_data[0] else 10
+        chart_dist.valueAxis.valueMin = 0
+        chart_dist.valueAxis.valueMax = max(max_val + max_val//5 + 1, 5)
+        chart_dist.valueAxis.valueStep = max(1, chart_dist.valueAxis.valueMax // 5)
+        
+        for i, col in enumerate(series_colors):
+            chart_dist.bars[i].fillColor = col
+            
+        legend = Legend()
+        legend.x = 520
+        legend.y = 170
+        legend.dx = 8
+        legend.dy = 8
+        legend.fontName = 'Helvetica'
+        legend.fontSize = 8
+        legend.boxAnchor = 'nw'
+        legend.columnMaximum = 6
+        legend.alignment = 'right'
+        legend.colorNamePairs = [(series_colors[i], series_names[i]) for i in range(len(series_names))]
+        
+        d_dist.add(chart_dist)
+        d_dist.add(legend)
+        
+        story.append(KeepTogether([
+            Paragraph("Mark Distribution by Subject", section_style),
+            d_dist
+        ]))
 
     # ── Signature line ──────────────────────────────────────
     story.append(Spacer(1, 0.8 * cm))
