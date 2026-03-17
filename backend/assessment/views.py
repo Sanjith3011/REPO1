@@ -1,5 +1,7 @@
 from django.http import HttpResponse, JsonResponse
 import os
+import csv
+from statistics import mean, median, mode, StatisticsError
 from django.db import transaction
 from rest_framework import status, serializers, exceptions
 from rest_framework.decorators import api_view, permission_classes
@@ -662,7 +664,11 @@ def _compute_summary(students_qs, subjects_qs, assessment_type):
 
     student_rows = []
     subject_stats = {
-        s.id: {'attended': 0, 'pass': 0, 'fail': 0, 'r50_60': 0, 'r60_70': 0, 'r70_80': 0, 'r80_90': 0, 'r90_100': 0}
+        s.id: {
+            'attended': 0, 'pass': 0, 'fail': 0, 
+            'r50_60': 0, 'r60_70': 0, 'r70_80': 0, 'r80_90': 0, 'r90_100': 0,
+            'all_marks': []
+        }
         for s in subjects_qs
     }
 
@@ -688,6 +694,7 @@ def _compute_summary(students_qs, subjects_qs, assessment_type):
             else:
                 marks_list_row.append(m.marks)
                 subject_stats[subj.id]['attended'] += 1
+                subject_stats[subj.id]['all_marks'].append(m.marks)
                 # pass threshold: 50% of max
                 max_m = 30 if assessment_type.startswith('CT') else 100  # CT:30/pass15, CAT:100/pass50
                 pct_mark = (m.marks / max_m) * 100
@@ -726,6 +733,18 @@ def _compute_summary(students_qs, subjects_qs, assessment_type):
         s = subject_stats[subj.id]
         att = s['attended']
         pct = (s['pass'] / att * 100) if att > 0 else 0
+        # Stats calculation
+        raw_marks = s['all_marks']
+        s_mean = s_median = s_mode = 0
+        if raw_marks:
+            s_mean = round(mean(raw_marks), 1)
+            s_median = round(median(raw_marks), 1)
+            try:
+                s_mode = mode(raw_marks)
+            except StatisticsError:
+                # If multiple modes exist, just pick the first one or handle accordingly
+                s_mode = raw_marks[0] if raw_marks else 0
+
         subject_summary.append({
             'subject_id': subj.id,
             'code': subj.code,
@@ -735,6 +754,9 @@ def _compute_summary(students_qs, subjects_qs, assessment_type):
             'pass': s['pass'],
             'fail': s['fail'],
             'pass_pct': round(pct, 1),
+            'mean': s_mean,
+            'median': s_median,
+            'mode': s_mode,
             'r50_60': s['r50_60'],
             'r60_70': s['r60_70'],
             'r70_80': s['r70_80'],
@@ -851,6 +873,79 @@ def export_pdf(request):
     filename = f"assessment_{dept.code}_{year}_Sem{sem}_{assessment_type}.pdf"
     response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminOrTeacher])
+def export_csv(request):
+    batch_id = request.query_params.get('batch')
+    dept_id = request.query_params.get('department')
+    year = request.query_params.get('year')
+    sem = request.query_params.get('semester')
+    assessment_type = request.query_params.get('assessment_type')
+
+    if not all([batch_id, dept_id, year, sem, assessment_type]):
+        return HttpResponse('Missing filters', status=400)
+
+    try:
+        batch = Batch.objects.get(id=batch_id)
+        dept = Department.objects.get(id=dept_id)
+    except (Batch.DoesNotExist, Department.DoesNotExist):
+        return HttpResponse('Invalid batch or department', status=404)
+
+    students_qs = Student.objects.filter(batch_id=batch_id, department_id=dept_id, year=year).order_by('roll_no')
+    subjects_qs = Subject.objects.filter(department_id=dept_id, semester=sem).order_by('code')
+
+    student_rows, subject_summary, class_summary = _compute_summary(students_qs, subjects_qs, assessment_type)
+
+    response = HttpResponse(content_type='text/csv')
+    filename = f"assessment_{dept.code}_{year}_Sem{sem}_{assessment_type}.csv"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    writer = csv.writer(response)
+    
+    # Header
+    header = ['Roll No', 'Name']
+    for s in subjects_qs:
+        header.append(f"{s.code} - {s.name}")
+    header += ['Pass Count', 'Fail Count', 'Absent Count']
+    writer.writerow(header)
+
+    # Data Rows
+    for st in student_rows:
+        row = [st['roll_no'], st['name']]
+        row += [str(m) if m is not None else '' for m in st['marks']]
+        row += [st['pass_count'], st['fail_count'], st['absent_count']]
+        writer.writerow(row)
+
+    # Summary Stats
+    writer.writerow([])
+    writer.writerow(['Subject Summary Stats'])
+    
+    stat_labels = ['Pass %', 'Mean', 'Median', 'Mode']
+    for label in stat_labels:
+        row = ['', label]
+        for s in subject_summary:
+            if label == 'Pass %':
+                row.append(f"{s['pass_pct']}%")
+            elif label == 'Mean':
+                row.append(s['mean'])
+            elif label == 'Median':
+                row.append(s['median'])
+            elif label == 'Mode':
+                row.append(s['mode'])
+        writer.writerow(row)
+
+    # Class Summary
+    writer.writerow([])
+    writer.writerow(['Class Summary'])
+    writer.writerow(['Total Students', class_summary['total']])
+    writer.writerow(['Attended', class_summary['attended']])
+    writer.writerow(['Passed', class_summary['pass']])
+    writer.writerow(['Failed', class_summary['fail']])
+    writer.writerow(['Overall Pass %', f"{class_summary['pass_pct']}%"])
+
     return response
 
 

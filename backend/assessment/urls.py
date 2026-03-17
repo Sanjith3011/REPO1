@@ -41,6 +41,7 @@ urlpatterns = [
     path('marks/save/', views.marks_save, name='marks_save'),
     path('marks/summary/', views.marks_summary, name='marks_summary'),
     path('marks/export-pdf/', views.export_pdf, name='export_pdf'),
+    path('marks/export-csv/', views.export_csv, name='export_csv'),
 
     # Student portal
     path('student/marks/', views.student_own_marks, name='student_own_marks'),

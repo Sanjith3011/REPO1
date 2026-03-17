@@ -221,7 +221,7 @@ def generate_marks_pdf(context):
     story.append(Spacer(1, 0.4 * cm))
     story.append(Paragraph("Subject-wise Performance Summary", section_style))
 
-    subj_header = ['S.No', 'Name of the Subject', 'Name of the Staff', 'Attended', 'Passed', 'Failed', 'Pass %']
+    subj_header = ['S.No', 'Name of the Subject', 'Name of the Staff', 'Attended', 'Passed', 'Failed', 'Mean', 'Median', 'Mode', 'Pass %']
     subj_data   = [subj_header]
 
     for i, (subj, ss) in enumerate(zip(subjects, context['subject_summary'])):
@@ -234,12 +234,15 @@ def generate_marks_pdf(context):
             str(ss['attended']),
             str(ss['pass']),
             str(ss['fail']),
+            str(ss['mean']),
+            str(ss['median']),
+            str(ss['mode']),
             f"{ss['pass_pct']:.1f}%",
         ])
 
     subj_table = Table(
         subj_data,
-        colWidths=[1*cm, 7*cm, 4.5*cm, 2*cm, 2*cm, 2*cm, 2*cm],
+        colWidths=[0.8*cm, 6.0*cm, 3.8*cm, 1.5*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.5*cm],
         repeatRows=1
     )
     subj_table.setStyle(TableStyle([

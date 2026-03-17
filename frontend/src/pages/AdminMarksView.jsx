@@ -332,7 +332,32 @@ export default function AdminMarksView() {
             }
         }
         const pct = attended > 0 ? ((pass / attended) * 100).toFixed(1) : '0.0'
-        return { attended, pass, fail, pct }
+
+        // Calculate Mean, Median, Mode
+        const marks = students.map(st => localMarks[`${st.student_id}_${subject_id}`])
+                              .filter(v => v !== '' && v !== 'AB' && v !== 'N/A' && v !== undefined)
+                              .map(v => parseFloat(v))
+                              .filter(n => !isNaN(n));
+        
+        let mean = 0, median = 0, mode = 0;
+        if (marks.length > 0) {
+            mean = (marks.reduce((a, b) => a + b, 0) / marks.length).toFixed(1);
+            const sorted = [...marks].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            median = sorted.length % 2 !== 0 ? sorted[mid] : ((sorted[mid - 1] + sorted[mid]) / 2).toFixed(1);
+            
+            const counts = {};
+            marks.forEach(m => counts[m] = (counts[m] || 0) + 1);
+            let maxCount = 0;
+            for (const m in counts) {
+                if (counts[m] > maxCount) {
+                    maxCount = counts[m];
+                    mode = m;
+                }
+            }
+        }
+
+        return { attended, pass, fail, pct, mean, median, mode }
     }
 
     // Per-subject marks distribution (percentage bands)
@@ -415,6 +440,26 @@ export default function AdminMarksView() {
             window.URL.revokeObjectURL(url)
         } catch (err) {
             showToast('PDF generation failed', 'error')
+        }
+    }
+
+    const handleExportCSV = async () => {
+        try {
+            const params = new URLSearchParams(filter).toString()
+            const response = await api.get(`/marks/export-csv/?${params}`, {
+                responseType: 'blob'
+            })
+            
+            const url = window.URL.createObjectURL(new Blob([response.data]))
+            const link = document.createElement('a')
+            link.href = url
+            link.setAttribute('download', `assessment_${filter.assessment_type}.csv`)
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+            window.URL.revokeObjectURL(url)
+        } catch (err) {
+            showToast('CSV export failed', 'error')
         }
     }
 
@@ -547,6 +592,9 @@ export default function AdminMarksView() {
                                     </button>
                                     <button id="export-pdf-btn" className="btn btn-accent" onClick={handleExportPDF}>
                                         📄 Export PDF
+                                    </button>
+                                    <button id="export-csv-btn" className="btn btn-outline" style={{ borderColor: '#2e7d32', color: '#2e7d32' }} onClick={handleExportCSV}>
+                                        📊 Export CSV
                                     </button>
                                 </div>
                             </div>
@@ -777,6 +825,9 @@ export default function AdminMarksView() {
                                             <th>Attended</th>
                                             <th>Passed</th>
                                             <th>Failed</th>
+                                            <th>Mean</th>
+                                            <th>Median</th>
+                                            <th>Mode</th>
                                             <th>Pass %</th>
                                         </tr>
                                     </thead>
@@ -796,6 +847,9 @@ export default function AdminMarksView() {
                                                     <td>{s.attended}</td>
                                                     <td className="stat-cell-pass">{s.pass}</td>
                                                     <td className="stat-cell-fail">{s.fail}</td>
+                                                    <td style={{ fontWeight: 600, color: 'var(--primary)' }}>{s.mean}</td>
+                                                    <td style={{ fontWeight: 600 }}>{s.median}</td>
+                                                    <td style={{ fontWeight: 600 }}>{s.mode}</td>
                                                     <td style={{ fontWeight: 700 }}>{s.pct}%</td>
                                                 </tr>
                                             )
