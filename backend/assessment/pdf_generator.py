@@ -462,37 +462,35 @@ def generate_marks_pdf(context):
             d
         ]))
 
-    # Standard Deviation Chart
-    stdev_data = []
-    for ss in context['subject_summary']:
-        stdev_data.append(ss['stdev'])
-    
-    if stdev_data:
+    # Individual Subject Standard Deviation Charts
+    if context['subject_summary']:
         story.append(Spacer(1, 0.5 * cm))
-        d_sd = Drawing(600, 200)
-        chart_sd = VerticalBarChart()
-        chart_sd.width = 500
-        chart_sd.height = 130
-        chart_sd.x = 50
-        chart_sd.y = 40
-        chart_sd.data = [stdev_data]
-        chart_sd.categoryAxis.categoryNames = subject_names
-        chart_sd.categoryAxis.labels.boxAnchor = 'ne'
-        chart_sd.categoryAxis.labels.dx = 0
-        chart_sd.categoryAxis.labels.dy = -2
-        chart_sd.categoryAxis.labels.angle = 0
+        story.append(Paragraph("Individual Subject Standard Deviation", section_style))
         
-        max_sd = max(stdev_data) if stdev_data else 10
-        chart_sd.valueAxis.valueMin = 0
-        chart_sd.valueAxis.valueMax = max(round(max_sd + 2), 5)
-        chart_sd.valueAxis.valueStep = max(1, chart_sd.valueAxis.valueMax // 5)
-        chart_sd.bars[0].fillColor = colors.HexColor('#1a237e') # navy color
-        
-        d_sd.add(chart_sd)
-        story.append(KeepTogether([
-            Paragraph("Subject-wise Standard Deviation", section_style),
-            d_sd
-        ]))
+        # We can group them nicely or list them
+        for ss in context['subject_summary']:
+            d_sd = Drawing(600, 160)
+            chart_sd = VerticalBarChart()
+            chart_sd.width = 120  # Smaller chart since it's only one bar
+            chart_sd.height = 100
+            chart_sd.x = 80
+            chart_sd.y = 30
+            chart_sd.data = [[ss['stdev']]]
+            chart_sd.categoryAxis.categoryNames = [f"{ss['code']} S.D"]
+            chart_sd.categoryAxis.labels.fontSize = 8
+            
+            # Simple max value for single bar chart
+            chart_sd.valueAxis.valueMin = 0
+            chart_sd.valueAxis.valueMax = max(round(ss['stdev'] + 2), 5)
+            chart_sd.valueAxis.valueStep = 1
+            chart_sd.bars[0].fillColor = colors.HexColor('#1a237e')
+            
+            d_sd.add(chart_sd)
+            story.append(KeepTogether([
+                Paragraph(f"<b>{ss['code']}</b> – {ss['name']} (S.D: {ss['stdev']})", info_style),
+                d_sd,
+                Spacer(1, 0.3 * cm)
+            ]))
 
     # Mark Distribution Chart
     dist_data = [[], [], [], [], [], []]
