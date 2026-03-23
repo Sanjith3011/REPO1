@@ -4,10 +4,11 @@ from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable, KeepTogether
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.shapes import Drawing, PolyLine, Polygon, Line, String
 from reportlab.graphics.charts.barcharts import VerticalBarChart
 from reportlab.graphics.charts.legends import Legend
 import io
+import math
 
 
 # ── College Details ─────────────────────────────────────────────────
@@ -17,6 +18,91 @@ COLLEGE_LOCATION = "TIRUPPUR – 638 660"
 COLLEGE_APPROVAL = "Approved by AICTE, New Delhi & Affiliated to Anna University, Chennai"
 COLLEGE_ACCRED   = "Recognized by UGC & Accredited by NBA (CSE and ECE)"
 # ────────────────────────────────────────────────────────────────────
+
+
+# ── Drawing Helpers ─────────────────────────────────────────────────
+def generate_bell_curve(mu, sigma, width=440, height=180):
+    if sigma <= 0: sigma = 0.5
+    
+    d = Drawing(width, height)
+    
+    # Shaded range (+/- 3 sigma)
+    x_range_min = mu - 3.5 * sigma
+    x_range_max = mu + 3.5 * sigma
+    
+    def f(x):
+        # Normal dist formula
+        return (1.0 / (sigma * math.sqrt(2 * math.pi))) * math.exp(-0.5 * ((x - mu) / sigma) ** 2)
+
+    y_max_val = f(mu)
+    
+    # Mapping helpers
+    def get_x(val):
+        return (val - x_range_min) / (x_range_max - x_range_min) * (0.85 * width) + (0.075 * width)
+    
+    def get_y(val):
+        return (val / y_max_val) * (0.75 * height) + (0.15 * height)
+
+    # Shaded zones: 3rd (light), 2nd (medium), 1st (dark blue)
+    # Zone colors matching the provided image style
+    z_colors = [
+        colors.HexColor('#a2c4d9'), # 3rd sigma zone
+        colors.HexColor('#6294b5'), # 2nd sigma zone
+        colors.HexColor('#01578c')  # 1st sigma zone
+    ]
+    
+    for i, mult in enumerate([3, 2, 1]):
+        x_s = mu - mult * sigma
+        x_e = mu + mult * sigma
+        points = [get_x(x_s), get_y(0)] # Start bottom left
+        
+        # Curve points across this range
+        n_steps = 30
+        for s in range(n_steps + 1):
+            px = x_s + (x_e - x_s) * s / n_steps
+            points.append(get_x(px))
+            points.append(get_y(f(px)))
+            
+        points.extend([get_x(x_e), get_y(0)]) # Close at bottom right
+        d.add(Polygon(points, fillColor=z_colors[i], strokeColor=None))
+
+    # Main Curve Line
+    curve_points = []
+    n_total = 100
+    for s in range(n_total + 1):
+        px = x_range_min + (x_range_max - x_range_min) * s / n_total
+        curve_points.append(get_x(px))
+        curve_points.append(get_y(f(px)))
+    d.add(PolyLine(curve_points, strokeColor=colors.black, strokeWidth=1))
+
+    # Vertical Mean line
+    d.add(Line(get_x(mu), get_y(0), get_x(mu), get_y(y_max_val), strokeColor=colors.black, strokeWidth=1, strokeDashArray=[2, 2]))
+
+    # X-axis ticks and labels
+    # Base line
+    d.add(Line(get_x(x_range_min), get_y(0), get_x(x_range_max), get_y(0), strokeColor=colors.black, strokeWidth=0.8))
+    
+    # Tick marks for mu and sigmas
+    for mult in [-3, -2, -1, 0, 1, 2, 3]:
+        val = mu + mult * sigma
+        vx = get_x(val)
+        d.add(Line(vx, get_y(0), vx, get_y(0) - 4, strokeColor=colors.black, strokeWidth=1))
+        d.add(String(vx, get_y(0) - 12, f"{val:.1f}", fontSize=7, textAnchor='middle', fontName='Helvetica'))
+
+    # Probability labels (approx matching user image)
+    d.add(String(get_x(mu + 1.2 * sigma), get_y(f(mu + 1.2 * sigma)) + 5, "68%", fontSize=7, fontName='Helvetica-Bold'))
+    d.add(String(get_x(mu + 2.1 * sigma), get_y(f(mu + 2.1 * sigma)) + 5, "95%", fontSize=7, fontName='Helvetica-Bold'))
+
+    # Legend symbols (top left)
+    legend_x = 20
+    legend_y = height - 15
+    d.add(Line(legend_x, legend_y, legend_x + 15, legend_y, strokeColor=colors.HexColor('#01578c'), strokeWidth=2))
+    d.add(String(legend_x + 20, legend_y - 2, f"σ = {sigma:.3f}", fontSize=8, fontName='Helvetica'))
+    
+    d.add(Line(legend_x, legend_y - 12, legend_x + 15, legend_y - 12, strokeColor=colors.black, strokeWidth=1, strokeDashArray=[2, 2]))
+    d.add(String(legend_x + 20, legend_y - 14, f"μ = {mu:.3f}", fontSize=8, fontName='Helvetica'))
+
+    return d
 
 
 def generate_marks_pdf(context):
@@ -462,34 +548,20 @@ def generate_marks_pdf(context):
             d
         ]))
 
-    # Individual Subject Standard Deviation Charts
+    # Individual Subject Bell Curves (Normal Distribution)
     if context['subject_summary']:
-        story.append(Spacer(1, 0.5 * cm))
-        story.append(Paragraph("Individual Subject Standard Deviation", section_style))
+        story.append(Spacer(1, 0.4 * cm))
+        story.append(Paragraph("Subject-wise Standard Deviation (Normal Distribution Graphs)", section_style))
+        story.append(Spacer(1, 0.2 * cm))
         
-        # We can group them nicely or list them
         for ss in context['subject_summary']:
-            d_sd = Drawing(600, 160)
-            chart_sd = VerticalBarChart()
-            chart_sd.width = 120  # Smaller chart since it's only one bar
-            chart_sd.height = 100
-            chart_sd.x = 80
-            chart_sd.y = 30
-            chart_sd.data = [[ss['stdev']]]
-            chart_sd.categoryAxis.categoryNames = [f"{ss['code']} S.D"]
-            chart_sd.categoryAxis.labels.fontSize = 8
+            # Use generate_bell_curve instead of BarChart
+            d_bell = generate_bell_curve(ss['mean'], ss['stdev'])
             
-            # Simple max value for single bar chart
-            chart_sd.valueAxis.valueMin = 0
-            chart_sd.valueAxis.valueMax = max(round(ss['stdev'] + 2), 5)
-            chart_sd.valueAxis.valueStep = 1
-            chart_sd.bars[0].fillColor = colors.HexColor('#1a237e')
-            
-            d_sd.add(chart_sd)
             story.append(KeepTogether([
-                Paragraph(f"<b>{ss['code']}</b> – {ss['name']} (S.D: {ss['stdev']})", info_style),
-                d_sd,
-                Spacer(1, 0.3 * cm)
+                Paragraph(f"<b>{ss['code']}</b> – {ss['name']}", info_style),
+                d_bell,
+                Spacer(1, 0.4 * cm)
             ]))
 
     # Mark Distribution Chart
