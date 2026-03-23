@@ -221,7 +221,7 @@ def generate_marks_pdf(context):
     story.append(Spacer(1, 0.4 * cm))
     story.append(Paragraph("Subject-wise Performance Summary", section_style))
 
-    subj_header = ['S.No', 'Name of the Subject', 'Name of the Staff', 'Attended', 'Passed', 'Failed', 'Mean', 'Median', 'Mode', 'Pass %']
+    subj_header = ['S.No', 'Name of the Subject', 'Name of the Staff', 'Attended', 'Passed', 'Failed', 'Mean', 'Median', 'Mode', 'S.D', 'Pass %']
     subj_data   = [subj_header]
 
     for i, (subj, ss) in enumerate(zip(subjects, context['subject_summary'])):
@@ -237,12 +237,13 @@ def generate_marks_pdf(context):
             str(ss['mean']),
             str(ss['median']),
             str(ss['mode']),
+            str(ss['stdev']),
             f"{ss['pass_pct']:.1f}%",
         ])
 
     subj_table = Table(
         subj_data,
-        colWidths=[0.8*cm, 6.0*cm, 3.8*cm, 1.5*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.3*cm, 1.5*cm],
+        colWidths=[0.8*cm, 5.2*cm, 3.4*cm, 1.4*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.5*cm],
         repeatRows=1
     )
     subj_table.setStyle(TableStyle([
@@ -459,6 +460,38 @@ def generate_marks_pdf(context):
         story.append(KeepTogether([
             Paragraph("Subject-wise Pass Percentage", section_style),
             d
+        ]))
+
+    # Standard Deviation Chart
+    stdev_data = []
+    for ss in context['subject_summary']:
+        stdev_data.append(ss['stdev'])
+    
+    if stdev_data:
+        story.append(Spacer(1, 0.5 * cm))
+        d_sd = Drawing(600, 200)
+        chart_sd = VerticalBarChart()
+        chart_sd.width = 500
+        chart_sd.height = 130
+        chart_sd.x = 50
+        chart_sd.y = 40
+        chart_sd.data = [stdev_data]
+        chart_sd.categoryAxis.categoryNames = subject_names
+        chart_sd.categoryAxis.labels.boxAnchor = 'ne'
+        chart_sd.categoryAxis.labels.dx = 0
+        chart_sd.categoryAxis.labels.dy = -2
+        chart_sd.categoryAxis.labels.angle = 0
+        
+        max_sd = max(stdev_data) if stdev_data else 10
+        chart_sd.valueAxis.valueMin = 0
+        chart_sd.valueAxis.valueMax = max(round(max_sd + 2), 5)
+        chart_sd.valueAxis.valueStep = max(1, chart_sd.valueAxis.valueMax // 5)
+        chart_sd.bars[0].fillColor = colors.HexColor('#1a237e') # navy color
+        
+        d_sd.add(chart_sd)
+        story.append(KeepTogether([
+            Paragraph("Subject-wise Standard Deviation", section_style),
+            d_sd
         ]))
 
     # Mark Distribution Chart

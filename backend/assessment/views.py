@@ -1,7 +1,7 @@
 from django.http import HttpResponse, JsonResponse
 import os
 import csv
-from statistics import mean, median, mode, StatisticsError
+from statistics import mean, median, mode, pstdev, StatisticsError
 from django.db import transaction
 from rest_framework import status, serializers, exceptions
 from rest_framework.decorators import api_view, permission_classes
@@ -735,10 +735,11 @@ def _compute_summary(students_qs, subjects_qs, assessment_type):
         pct = (s['pass'] / att * 100) if att > 0 else 0
         # Stats calculation
         raw_marks = s['all_marks']
-        s_mean = s_median = s_mode = 0
+        s_mean = s_median = s_mode = s_stdev = 0
         if raw_marks:
             s_mean = round(mean(raw_marks), 1)
             s_median = round(median(raw_marks), 1)
+            s_stdev = round(pstdev(raw_marks), 2)
             try:
                 s_mode = mode(raw_marks)
             except StatisticsError:
@@ -757,6 +758,7 @@ def _compute_summary(students_qs, subjects_qs, assessment_type):
             'mean': s_mean,
             'median': s_median,
             'mode': s_mode,
+            'stdev': s_stdev,
             'r50_60': s['r50_60'],
             'r60_70': s['r60_70'],
             'r70_80': s['r70_80'],
@@ -923,7 +925,7 @@ def export_csv(request):
     writer.writerow([])
     writer.writerow(['Subject Summary Stats'])
     
-    stat_labels = ['Pass %', 'Mean', 'Median', 'Mode']
+    stat_labels = ['Pass %', 'Mean', 'Median', 'Mode', 'Standard Deviation']
     for label in stat_labels:
         row = ['', label]
         for s in subject_summary:
@@ -935,6 +937,8 @@ def export_csv(request):
                 row.append(s['median'])
             elif label == 'Mode':
                 row.append(s['mode'])
+            elif label == 'Standard Deviation':
+                row.append(s['stdev'])
         writer.writerow(row)
 
     # Class Summary
