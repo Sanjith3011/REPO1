@@ -333,10 +333,10 @@ export default function TeacherDashboard() {
         const upperVal = val.toUpperCase()
         if (upperVal !== '' && upperVal !== 'A' && upperVal !== 'AB') {
             const num = parseFloat(upperVal)
-            // Strict 0-100 logic (allows decimals if user types them, e.g. 10.5)
+            // Validation logic based on conducted max (allows decimals if user types them, e.g. 10.5)
             // But we first check if it's a completely invalid string
             const isInvalidText = !/^\d*\.?\d*$/.test(upperVal)
-            if (isNaN(num) || num < 0 || num > 100 || isInvalidText) {
+            if (isNaN(num) || num < 0 || num > customMax || isInvalidText) {
                 return // reject invalid input
             }
         }
