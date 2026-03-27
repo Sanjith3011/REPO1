@@ -2,7 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { 
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+    AreaChart, Area, Cell, ScatterChart, Scatter, LabelList
+} from 'recharts'
 
 const ASSESSMENT_TYPES = [
     { value: 'CT1', label: 'Class Test – 1', max: 30 },
@@ -179,6 +182,10 @@ export default function AdminMarksView() {
     const [loadingMarks, setLoadingMarks] = useState(false)
     const [showTable, setShowTable] = useState(false)
     const [showGraph, setShowGraph] = useState(false)
+    const [isComparisonMode, setIsComparisonMode] = useState(false)
+    const [comparisonAssessmentType, setComparisonAssessmentType] = useState('')
+    const [comparisonStudents, setComparisonStudents] = useState([]) // Comparison data
+    const [loadingComparison, setLoadingComparison] = useState(false)
 
     const [toast, setToast] = useState(null)
     const showToast = (message, type = 'success') => setToast({ message, type })
@@ -263,6 +270,24 @@ export default function AdminMarksView() {
                 }
             }
             setLocalMarks(init)
+
+            // If Comparison Mode is ON and a second assessment is selected, load it too
+            if (isComparisonMode && comparisonAssessmentType) {
+                setLoadingComparison(true);
+                try {
+                    const compResp = await api.get('/marks/', { 
+                        params: { ...filter, assessment_type: comparisonAssessmentType } 
+                    });
+                    setComparisonStudents(compResp.data.students || []);
+                } catch (e) {
+                    showToast('Error loading comparison data', 'error');
+                } finally {
+                    setLoadingComparison(false);
+                }
+            } else {
+                setComparisonStudents([]);
+            }
+
             setShowTable(true)
         } catch (e) {
             showToast('Error loading marks', 'error')
@@ -358,6 +383,42 @@ export default function AdminMarksView() {
         }
 
         return { attended, pass, fail, pct, mean, median, mode }
+    }
+
+    const getSubjectStatsWithSD = (subject_id) => {
+        const stats = getSubjectStats(subject_id)
+        
+        const marks = students.map(st => localMarks[`${st.student_id}_${subject_id}`])
+                              .filter(v => v !== '' && v !== 'AB' && v !== 'N/A' && v !== undefined)
+                              .map(v => parseFloat(v))
+                              .filter(n => !isNaN(n));
+        
+        let stdev = 0;
+        if (marks.length > 1) {
+            const m = parseFloat(stats.mean);
+            const squareDiffs = marks.map(v => Math.pow(v - m, 2));
+            const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / marks.length;
+            stdev = Math.sqrt(avgSquareDiff).toFixed(2);
+        }
+        
+        return { ...stats, stdev, marks }
+    }
+
+    // Helper to generate Bell Curve data
+    const generateBellCurveData = (mean, stdev, maxMarks) => {
+        if (stdev <= 0) return [];
+        const points = [];
+        const m = parseFloat(mean);
+        const s = parseFloat(stdev);
+        
+        // Generate points from mean-3sd to mean+3sd, clamped to [0, maxMarks]
+        const step = maxMarks / 50;
+        for (let x = 0; x <= maxMarks; x += step) {
+            const exponent = -Math.pow(x - m, 2) / (2 * Math.pow(s, 2));
+            const y = (1 / (s * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
+            points.push({ x: Math.round(x * 10) / 10, y: y });
+        }
+        return points;
     }
 
     // Per-subject marks distribution (percentage bands)
@@ -599,140 +660,189 @@ export default function AdminMarksView() {
                                 </div>
                             </div>
 
+                            <div className="card" style={{ marginBottom: 16, padding: '14px 20px', background: 'var(--bg-body)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontWeight: 600 }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={isComparisonMode} 
+                                            onChange={e => setIsComparisonMode(e.target.checked)}
+                                            style={{ width: 18, height: 18 }}
+                                        />
+                                        Enable Comparison Mode
+                                    </label>
+                                    
+                                    {isComparisonMode && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, maxWidth: 400 }}>
+                                            <label style={{ whiteSpace: 'nowrap', fontSize: 13, fontWeight: 700 }}>Compare Test 1 with:</label>
+                                            <select 
+                                                className="form-control" 
+                                                value={comparisonAssessmentType} 
+                                                onChange={e => setComparisonAssessmentType(e.target.value)}
+                                            >
+                                                <option value="">-- Select Test 2 --</option>
+                                                {ASSESSMENT_TYPES.filter(a => a.value !== filter.assessment_type).map(a => (
+                                                    <option key={a.value} value={a.value}>{a.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             {showGraph ? (
                                 <div className="card" style={{ marginBottom: 20, padding: 24 }}>
-                                    <div className="section-title" style={{ marginBottom: 24, textAlign: 'center' }}>
-                                        Subject-wise Pass Percentage
-                                    </div>
-                                    <div style={{ width: '100%', height: 400, marginBottom: 40 }}>
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart
-                                                data={subjects.map(s => ({
-                                                    name: s.code,
-                                                    fullName: s.name,
-                                                    percentage: parseFloat(getSubjectStats(s.id).pct)
-                                                }))}
-                                                margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
-                                            >
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
-                                                <defs>
-                                                    <linearGradient id="colorPass" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.9}/>
-                                                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.6}/>
-                                                    </linearGradient>
-                                                    <linearGradient id="colorFail" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="var(--danger)" stopOpacity={0.8}/>
-                                                        <stop offset="95%" stopColor="var(--danger)" stopOpacity={0.5}/>
-                                                    </linearGradient>
-                                                    <filter id="shadowPass" x="-20%" y="-20%" width="140%" height="140%">
-                                                        <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="var(--primary)" floodOpacity="0.3"/>
-                                                    </filter>
-                                                    <filter id="shadowFail" x="-20%" y="-20%" width="140%" height="140%">
-                                                        <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="var(--danger)" floodOpacity="0.3"/>
-                                                    </filter>
-                                                </defs>
-                                                <XAxis 
-                                                    dataKey="name" 
-                                                    tick={{ fill: 'var(--text-light)', fontSize: 13, fontWeight: 600 }}
-                                                    axisLine={{ stroke: 'var(--border)' }}
-                                                    tickLine={false}
-                                                    interval={0}
-                                                    angle={-30}
-                                                    textAnchor="end"
-                                                />
-                                                <YAxis 
-                                                    domain={[0, 100]}
-                                                    tickFormatter={(value) => `${value}%`}
-                                                    tick={{ fill: 'var(--text-light)', fontSize: 13 }}
-                                                    axisLine={false}
-                                                    tickLine={false}
-                                                />
-                                                <Tooltip 
-                                                    cursor={{ fill: 'var(--bg-body)' }}
-                                                    content={({ active, payload }) => {
-                                                        if (active && payload && payload.length) {
-                                                            const data = payload[0].payload;
-                                                            return (
-                                                                <div style={{ background: '#fff', padding: '12px 16px', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-                                                                    <div style={{ fontWeight: 700, color: 'var(--primary)', marginBottom: 4, fontSize: 14 }}>{data.name}</div>
-                                                                    <div style={{ color: 'var(--text-light)', fontSize: 12, marginBottom: 8, maxWidth: 220, whiteSpace: 'normal' }}>{data.fullName}</div>
-                                                                    <div style={{ fontWeight: 800, fontSize: 16, color: data.percentage >= 50 ? 'var(--success)' : 'var(--danger)' }}>
-                                                                        {data.percentage}% Pass
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        }
-                                                        return null;
-                                                    }}
-                                                />
-                                                <Bar 
-                                                    dataKey="percentage" 
-                                                    radius={[6, 6, 0, 0]}
-                                                    barSize={45}
-                                                >
-                                                    {
-                                                        subjects.map((s, index) => {
-                                                            const pct = parseFloat(getSubjectStats(s.id).pct);
-                                                            const isPass = pct >= 50;
-                                                            return <cell key={`cell-${index}`} fill={isPass ? 'url(#colorPass)' : 'url(#colorFail)'} filter={isPass ? 'url(#shadowPass)' : 'url(#shadowFail)'} />;
-                                                        })
-                                                    }
-                                                </Bar>
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    </div>
+                                    {isComparisonMode && comparisonStudents.length > 0 ? (
+                                        <>
+                                            <div className="section-title" style={{ marginBottom: 24, textAlign: 'center' }}>
+                                                Test Comparison: {ASSESSMENT_TYPES.find(a => a.value === filter.assessment_type)?.label} vs {ASSESSMENT_TYPES.find(a => a.value === comparisonAssessmentType)?.label}
+                                            </div>
+                                            <div style={{ width: '100%', height: 450, marginBottom: 50 }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart
+                                                        data={subjects.map(s => {
+                                                            const stats1 = getSubjectStats(s.id);
+                                                            // Calculate stats for second assessment
+                                                            let attended2 = 0, pass2 = 0;
+                                                            comparisonStudents.forEach(st => {
+                                                                const mv = st.marks[s.id];
+                                                                if (mv && !mv.not_enrolled && mv.value !== null && !mv.is_absent) {
+                                                                    attended2++;
+                                                                    const num = parseFloat(mv.value);
+                                                                    if (num >= (getAssessmentMax() * 0.5)) pass2++;
+                                                                }
+                                                            });
+                                                            const pct2 = attended2 > 0 ? ((pass2 / attended2) * 100).toFixed(1) : '0.0';
+                                                            
+                                                            return {
+                                                                name: s.code,
+                                                                test1: parseFloat(stats1.pct),
+                                                                test2: parseFloat(pct2),
+                                                            };
+                                                        })}
+                                                        margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                        <XAxis dataKey="name" />
+                                                        <YAxis domain={[0, 100]} tickFormatter={v => `${v}%`} />
+                                                        <Tooltip />
+                                                        <Legend />
+                                                        <Bar name={ASSESSMENT_TYPES.find(a => a.value === filter.assessment_type)?.label} dataKey="test1" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+                                                        <Bar name={ASSESSMENT_TYPES.find(a => a.value === comparisonAssessmentType)?.label} dataKey="test2" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="section-title" style={{ marginBottom: 24, textAlign: 'center' }}>
+                                                Subject-wise Pass Percentage
+                                            </div>
+                                            <div style={{ width: '100%', height: 400, marginBottom: 40 }}>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart
+                                                        data={subjects.map(s => ({
+                                                            name: s.code,
+                                                            fullName: s.name,
+                                                            percentage: parseFloat(getSubjectStats(s.id).pct)
+                                                        }))}
+                                                        margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                                                        <defs>
+                                                            <linearGradient id="colorPass" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.9}/>
+                                                                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0.6}/>
+                                                            </linearGradient>
+                                                            <linearGradient id="colorFail" x1="0" y1="0" x2="0" y2="1">
+                                                                <stop offset="5%" stopColor="var(--danger)" stopOpacity={0.8}/>
+                                                                <stop offset="95%" stopColor="var(--danger)" stopOpacity={0.5}/>
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <XAxis dataKey="name" angle={-30} textAnchor="end" interval={0} height={60} />
+                                                        <YAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
+                                                        <Tooltip />
+                                                        <Bar dataKey="percentage" radius={[6, 6, 0, 0]} barSize={45}>
+                                                            {subjects.map((s, index) => {
+                                                                const pct = parseFloat(getSubjectStats(s.id).pct);
+                                                                return <Cell key={`cell-${index}`} fill={pct >= 50 ? 'url(#colorPass)' : 'url(#colorFail)'} />;
+                                                            })}
+                                                        </Bar>
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                        </>
+                                    )}
                                     
+                                    <div className="section-title" style={{ marginBottom: 24, textAlign: 'center', borderTop: '1px solid var(--border)', paddingTop: 40 }}>
+                                        Mark Distribution & Bell Curve (Standard Deviation)
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 30 }}>
+                                        {subjects.map(s => {
+                                            const stats = getSubjectStatsWithSD(s.id);
+                                            const bellData = generateBellCurveData(stats.mean, stats.stdev, customMax);
+                                            return (
+                                                <div key={s.id} className="card" style={{ padding: 16, background: '#fcfcfc' }}>
+                                                    <div style={{ fontWeight: 700, marginBottom: 16, textAlign: 'center', color: 'var(--primary)' }}>
+                                                        {s.code}: {s.name}
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'center', gap: 15, marginBottom: 15, fontSize: 12 }}>
+                                                        <div className="badge blue">Mean: {stats.mean}</div>
+                                                        <div className="badge blue">Median: {stats.median}</div>
+                                                        <div className="badge purple">σ (SD): {stats.stdev}</div>
+                                                    </div>
+                                                    <div style={{ width: '100%', height: 200 }}>
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <AreaChart data={bellData}>
+                                                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.4} />
+                                                                <XAxis dataKey="x" hide />
+                                                                <YAxis hide />
+                                                                <Tooltip 
+                                                                    labelFormatter={(v) => `Mark: ${bellData[v]?.x}`}
+                                                                    formatter={(v) => [`${Math.round(v * 1000) / 1000}`, 'Density']}
+                                                                />
+                                                                <Area 
+                                                                    type="monotone" 
+                                                                    dataKey="y" 
+                                                                    stroke="var(--primary)" 
+                                                                    fill="var(--primary)" 
+                                                                    fillOpacity={0.2} 
+                                                                    strokeWidth={2}
+                                                                />
+                                                            </AreaChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+                                                    <div style={{ fontSize: 11, textAlign: 'center', color: 'var(--text-light)', marginTop: 8 }}>
+                                                        Normal Distribution based on class performance
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
                                     <div className="section-title" style={{ marginBottom: 24, textAlign: 'center', marginTop: 40, borderTop: '1px solid var(--border)', paddingTop: 40 }}>
                                         Subject-wise Mark Distribution (Percentage Range)
                                     </div>
                                     <div style={{ width: '100%', height: 450 }}>
                                         <ResponsiveContainer width="100%" height="100%">
                                             <BarChart
-                                                data={subjects.map(s => {
-                                                    const dist = getSubjectMarkDistribution(s.id);
-                                                    return {
-                                                        name: s.code,
-                                                        fullName: s.name,
-                                                        ...dist
-                                                    };
-                                                })}
+                                                data={subjects.map(s => ({
+                                                    name: s.code,
+                                                    ...getSubjectMarkDistribution(s.id)
+                                                }))}
                                                 margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
                                             >
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
-                                                <XAxis 
-                                                    dataKey="name" 
-                                                    tick={{ fill: 'var(--text-light)', fontSize: 13, fontWeight: 600 }}
-                                                    axisLine={{ stroke: 'var(--border)' }}
-                                                    tickLine={false}
-                                                    interval={0}
-                                                    angle={-30}
-                                                    textAnchor="end"
-                                                />
-                                                <YAxis 
-                                                    tick={{ fill: 'var(--text-light)', fontSize: 13 }}
-                                                    axisLine={false}
-                                                    tickLine={false}
-                                                    label={{ value: 'Number of Students', angle: -90, position: 'insideLeft', style: { fill: 'var(--text-light)', fontSize: 14 } }}
-                                                />
-                                                <Tooltip 
-                                                    cursor={{ fill: 'var(--bg-body)' }}
-                                                    contentStyle={{ borderRadius: 8, border: '1px solid var(--border)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                                />
-                                                <Legend wrapperStyle={{ paddingTop: 20 }} />
-                                                <defs>
-                                                    <linearGradient id="gradRed" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.9}/><stop offset="95%" stopColor="#ef4444" stopOpacity={0.6}/></linearGradient>
-                                                    <linearGradient id="gradOrange" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.9}/><stop offset="95%" stopColor="#f97316" stopOpacity={0.6}/></linearGradient>
-                                                    <linearGradient id="gradYellow" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#eab308" stopOpacity={0.9}/><stop offset="95%" stopColor="#eab308" stopOpacity={0.6}/></linearGradient>
-                                                    <linearGradient id="gradLime" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#84cc16" stopOpacity={0.9}/><stop offset="95%" stopColor="#84cc16" stopOpacity={0.6}/></linearGradient>
-                                                    <linearGradient id="gradGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#22c55e" stopOpacity={0.9}/><stop offset="95%" stopColor="#22c55e" stopOpacity={0.6}/></linearGradient>
-                                                    <linearGradient id="gradDarkGreen" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#15803d" stopOpacity={0.9}/><stop offset="95%" stopColor="#15803d" stopOpacity={0.6}/></linearGradient>
-                                                </defs>
-                                                <Bar dataKey="< 50%" stackId="a" fill="url(#gradRed)" radius={[0, 0, 0, 0]} />
-                                                <Bar dataKey="50-60%" stackId="a" fill="url(#gradOrange)" radius={[0, 0, 0, 0]} />
-                                                <Bar dataKey="60-70%" stackId="a" fill="url(#gradYellow)" radius={[0, 0, 0, 0]} />
-                                                <Bar dataKey="70-80%" stackId="a" fill="url(#gradLime)" radius={[0, 0, 0, 0]} />
-                                                <Bar dataKey="80-90%" stackId="a" fill="url(#gradGreen)" radius={[0, 0, 0, 0]} />
-                                                <Bar dataKey="90-100%" stackId="a" fill="url(#gradDarkGreen)" radius={[6, 6, 0, 0]} />
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                                <XAxis dataKey="name" interval={0} angle={-30} textAnchor="end" height={60} />
+                                                <YAxis />
+                                                <Tooltip />
+                                                <Legend />
+                                                <Bar dataKey="< 50%" stackId="a" fill="#ef4444" />
+                                                <Bar dataKey="50-60%" stackId="a" fill="#f97316" />
+                                                <Bar dataKey="60-70%" stackId="a" fill="#eab308" />
+                                                <Bar dataKey="70-80%" stackId="a" fill="#84cc16" />
+                                                <Bar dataKey="80-90%" stackId="a" fill="#22c55e" />
+                                                <Bar dataKey="90-100%" stackId="a" fill="#15803d" />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </div>
