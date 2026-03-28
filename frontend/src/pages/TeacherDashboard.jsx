@@ -187,6 +187,7 @@ export default function TeacherDashboard() {
     const [comparisonAssessmentType, setComparisonAssessmentType] = useState('')
     const [comparisonStudents, setComparisonStudents] = useState([]) // Comparison data
     const [loadingComparison, setLoadingComparison] = useState(false)
+    const [selectedGraphPoint, setSelectedGraphPoint] = useState(null)
 
     const [toast, setToast] = useState(null)
     const showToast = (message, type = 'success') => setToast({ message, type })
@@ -840,7 +841,7 @@ export default function TeacherDashboard() {
                                             const stats = getSubjectStatsWithSD(s.id);
                                             const bellData = generateBellCurveData(stats.mean, stats.stdev, customMax);
                                             return (
-                                                <div key={s.id} className="card" style={{ padding: 16, background: '#fcfcfc' }}>
+                                                <div key={s.id} className="card" style={{ padding: 16, background: '#fcfcfc', position: 'relative' }}>
                                                     <div style={{ fontWeight: 700, marginBottom: 16, textAlign: 'center', color: 'var(--primary)' }}>
                                                         {s.code}: {s.name}
                                                     </div>
@@ -851,7 +852,24 @@ export default function TeacherDashboard() {
                                                     </div>
                                                     <div style={{ width: '100%', height: 200 }}>
                                                         <ResponsiveContainer width="100%" height="100%">
-                                                            <AreaChart data={bellData}>
+                                                            <AreaChart data={bellData} onClick={(e) => {
+                                                                if (e && e.activePayload && e.activePayload.length > 0) {
+                                                                    const clickedX = e.activePayload[0].payload.x;
+                                                                    const step = customMax / 50;
+                                                                    const matchedStudents = [];
+                                                                    students.forEach(st => {
+                                                                        const key = `${st.student_id}_${s.id}`;
+                                                                        const val = localMarks[key];
+                                                                        if (val && val !== 'AB' && val !== 'N/A') {
+                                                                            const mark = parseFloat(val);
+                                                                            if (!isNaN(mark) && Math.abs(mark - clickedX) <= step / 2) {
+                                                                                matchedStudents.push({ name: st.name, roll_no: st.roll_no, mark: mark });
+                                                                            }
+                                                                        }
+                                                                    });
+                                                                    setSelectedGraphPoint({ subjectId: s.id, subjectCode: s.code, markX: clickedX, students: matchedStudents });
+                                                                }
+                                                            }} style={{ cursor: 'pointer' }}>
                                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.4} />
                                                                 <XAxis dataKey="x" hide />
                                                                 <YAxis hide />
@@ -873,6 +891,37 @@ export default function TeacherDashboard() {
                                                     <div style={{ fontSize: 11, textAlign: 'center', color: 'var(--text-light)', marginTop: 8 }}>
                                                         Normal Distribution based on class performance
                                                     </div>
+                                                    {selectedGraphPoint && selectedGraphPoint.subjectId === s.id && (
+                                                        <div className="popup-card" style={{
+                                                            position: 'absolute', top: 60, right: 20, width: 280, 
+                                                            background: 'white', border: '1px solid var(--border)',
+                                                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)', borderRadius: 8,
+                                                            zIndex: 10, padding: 12
+                                                        }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                                                                <strong style={{ fontSize: 13, color: 'var(--primary)' }}>Students (~{selectedGraphPoint.markX} Marks)</strong>
+                                                                <button 
+                                                                  onClick={() => setSelectedGraphPoint(null)}
+                                                                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 0 }}
+                                                                >×</button>
+                                                            </div>
+                                                            <div style={{ maxHeight: 150, overflowY: 'auto' }}>
+                                                                {selectedGraphPoint.students.length > 0 ? (
+                                                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 12 }}>
+                                                                        {selectedGraphPoint.students.map(st => (
+                                                                            <li key={st.roll_no} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                                                                <span style={{ fontWeight: 600 }}>{st.roll_no}</span>
+                                                                                <span style={{ flex: 1, paddingLeft: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={st.name}>{st.name}</span>
+                                                                                <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{st.mark}</span>
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                ) : (
+                                                                    <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '10px 0' }}>No students in this range</div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}
