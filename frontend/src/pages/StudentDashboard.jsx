@@ -373,10 +373,12 @@ export default function StudentDashboard() {
                                                 <div style={{ flex: '2 1 400px' }}>
                                                     <div className="student-marks-grid">
                                                         {subjMarks.map((m, i) => {
-                                                            const statusClass = m.status === 'Pass' ? 'pass' : m.status === 'AB' ? 'absent' : 'fail'
+                                                            const statusClass = m.status === 'Pass' ? 'pass' : 
+                                                                              m.status === 'AB' ? 'absent' : 
+                                                                              m.status === 'Pending' ? 'pending' : 'fail'
                                                             
                                                             let displayMarks = m.marks;
-                                                            if (m.marks !== null && m.marks !== 'AB') {
+                                                            if (m.marks !== 'AB' && m.marks !== '—') {
                                                                 if (viewMode === '100') {
                                                                     displayMarks = `${Math.round((m.marks / m.max_marks) * 100)}%`;
                                                                 } else if (viewMode === '60') {
@@ -388,8 +390,8 @@ export default function StudentDashboard() {
                                                                 <div key={i} className={`subject-card ${statusClass}`} style={{ transition: 'all 0.3s ease' }}>
                                                                     <div className="sub-code">{m.subject_code}</div>
                                                                     <div className="sub-name">{m.subject_name}</div>
-                                                                    <div className="sub-marks" style={{ color: statusClass === 'fail' ? 'var(--danger)' : 'inherit' }}>
-                                                                        {m.marks !== null ? displayMarks : 'AB'}
+                                                                    <div className="sub-marks" style={{ color: statusClass === 'fail' ? 'var(--danger)' : statusClass === 'pending' ? 'var(--text-muted)' : 'inherit' }}>
+                                                                        {displayMarks}
                                                                     </div>
                                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
                                                                         <div className="sub-max" style={{ fontSize: 10 }}>

@@ -772,6 +772,11 @@ select.form-control {
   border-color: var(--absent);
 }
 
+.subject-card.pending {
+  border-color: var(--border);
+  opacity: 0.8;
+}
+
 .subject-card .sub-code {
   font-size: 11px;
   color: var(--text-muted);
@@ -833,4 +838,9 @@ select.form-control {
 
 .selectable-row:hover {
   background-color: rgba(0, 0, 0, 0.02);
+}
+
+.badge-pending {
+  background: var(--border);
+  color: var(--text-muted);
 }

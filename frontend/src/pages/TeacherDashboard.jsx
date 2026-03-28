@@ -1006,7 +1006,6 @@ export default function TeacherDashboard() {
                                                     key={st.student_id} 
                                                     className="selectable-row"
                                                     tabIndex={0}
-                                                    onClick={() => setSelectedComparisonStudent(st)} 
                                                     onKeyDown={(e) => {
                                                         if (e.key === 'Enter') {
                                                             e.preventDefault();
@@ -1021,12 +1020,18 @@ export default function TeacherDashboard() {
                                                             if (prevRow && prevRow.classList.contains('selectable-row')) prevRow.focus();
                                                         }
                                                     }}
-                                                    style={{ cursor: 'pointer' }} 
-                                                    title="Click to view student analysis"
                                                 >
                                                     <td>{idx + 1}</td>
-                                                    <td style={{ textAlign: 'left', paddingLeft: 12, fontWeight: 600 }}>{st.roll_no}</td>
-                                                    <td style={{ textAlign: 'left', paddingLeft: 12 }}>{st.name}</td>
+                                                    <td 
+                                                        onClick={() => setSelectedComparisonStudent(st)}
+                                                        style={{ textAlign: 'left', paddingLeft: 12, fontWeight: 600, cursor: 'pointer', color: 'var(--primary)' }}
+                                                        title="Click to view student analysis"
+                                                    >{st.roll_no}</td>
+                                                    <td 
+                                                        onClick={() => setSelectedComparisonStudent(st)}
+                                                        style={{ textAlign: 'left', paddingLeft: 12, cursor: 'pointer', color: 'var(--primary)' }}
+                                                        title="Click to view student analysis"
+                                                    >{st.name}</td>
                                                     {subjects.map(subj => {
                                                         const key = `${st.student_id}_${subj.id}`
                                                         const val = localMarks[key] || ''
