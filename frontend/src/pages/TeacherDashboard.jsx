@@ -539,6 +539,7 @@ export default function TeacherDashboard() {
             }
             await api.post('/marks/save/', payload)
             showToast('✅ Marks saved successfully!')
+            fetchMarks() // Force re-fetch from the database
         } catch {
             showToast('❌ Failed to save marks', 'error')
         } finally {
