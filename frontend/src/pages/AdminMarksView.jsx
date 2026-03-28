@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import { 
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-    AreaChart, Area, Cell, ScatterChart, Scatter, LabelList
+    AreaChart, Area, Cell, ScatterChart, Scatter, LabelList,
+    Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts'
 
 const ASSESSMENT_TYPES = [
@@ -187,6 +188,7 @@ export default function AdminMarksView() {
     const [comparisonStudents, setComparisonStudents] = useState([]) // Comparison data
     const [loadingComparison, setLoadingComparison] = useState(false)
     const [selectedGraphPoint, setSelectedGraphPoint] = useState(null)
+    const [selectedComparisonStudent, setSelectedComparisonStudent] = useState(null)
 
     const [toast, setToast] = useState(null)
     const showToast = (message, type = 'success') => setToast({ message, type })
@@ -873,7 +875,7 @@ export default function AdminMarksView() {
                                                                 {selectedGraphPoint.students.length > 0 ? (
                                                                     <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 12 }}>
                                                                         {selectedGraphPoint.students.map(st => (
-                                                                            <li key={st.roll_no} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                                                                            <li key={st.roll_no} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid #f0f0f0', cursor: isComparisonMode ? 'pointer' : 'default' }} onClick={() => { if (isComparisonMode) { const fullSt = students.find(s => s.roll_no === st.roll_no); if(fullSt) setSelectedComparisonStudent(fullSt); } }}>
                                                                                 <span style={{ fontWeight: 600 }}>{st.roll_no}</span>
                                                                                 <span style={{ flex: 1, paddingLeft: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={st.name}>{st.name}</span>
                                                                                 <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{st.mark}</span>
@@ -942,7 +944,7 @@ export default function AdminMarksView() {
                                         {students.map((st, idx) => {
                                             const stats = getStudentStats(st.student_id)
                                             return (
-                                                <tr key={st.student_id}>
+                                                <tr key={st.student_id} onClick={() => { if(isComparisonMode) setSelectedComparisonStudent(st) }} style={{ cursor: isComparisonMode ? 'pointer' : 'default' }} title={isComparisonMode ? "Click to view comparison analysis" : ""}>
                                                     <td>{idx + 1}</td>
                                                     <td style={{ textAlign: 'left', paddingLeft: 12, fontWeight: 600 }}>{st.roll_no}</td>
                                                     <td style={{ textAlign: 'left', paddingLeft: 12 }}>{st.name}</td>
@@ -1110,6 +1112,105 @@ export default function AdminMarksView() {
 
                 </div>
             </div>
+
+            {/* Student Comparison Modal */}
+            {selectedComparisonStudent && isComparisonMode && (
+                <div className="modal-overlay" style={{ display: 'flex', position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, alignItems: 'center', justifyContent: 'center' }} onClick={() => setSelectedComparisonStudent(null)}>
+                    <div className="modal-content" style={{ background: 'white', padding: 24, borderRadius: 12, width: '90%', maxWidth: 700, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
+                            <div>
+                                <h3 style={{ margin: 0, color: 'var(--primary)' }}>{selectedComparisonStudent.name}</h3>
+                                <div style={{ fontSize: 13, color: 'var(--text-light)', marginTop: 4, fontWeight: 600 }}>{selectedComparisonStudent.roll_no}</div>
+                            </div>
+                            <button className="btn" style={{ background: 'transparent', border: 'none', fontSize: 24, cursor: 'pointer', padding: 0, lineHeight: 1, color: 'var(--text-muted)' }} onClick={() => setSelectedComparisonStudent(null)}>×</button>
+                        </div>
+                        
+                        {(() => {
+                            const compSt = comparisonStudents.find(c => c.roll_no === selectedComparisonStudent.roll_no);
+                            const t1Label = ASSESSMENT_TYPES.find(a => a.value === filter.assessment_type)?.label || 'Test 1';
+                            const t2Label = ASSESSMENT_TYPES.find(a => a.value === comparisonAssessmentType)?.label || 'Test 2';
+                            const t2Max = ASSESSMENT_TYPES.find(a => a.value === comparisonAssessmentType)?.max || 100;
+                            
+                            const radarData = subjects.map(s => {
+                                const v1 = localMarks[`${selectedComparisonStudent.student_id}_${s.id}`];
+                                const m1 = parseFloat(v1);
+                                const pct1 = !isNaN(m1) ? (m1 / customMax) * 100 : 0;
+                                
+                                let pct2 = 0;
+                                let m2Text = 'N/A';
+                                if (compSt && compSt.marks) {
+                                    const v2 = compSt.marks[s.id];
+                                    if (v2 && !v2.not_enrolled && !v2.is_absent && v2.value !== null) {
+                                        m2Text = v2.value;
+                                        pct2 = (parseFloat(v2.value) / t2Max) * 100;
+                                    } else if (v2 && v2.is_absent) {
+                                        m2Text = 'AB';
+                                    }
+                                }
+                                
+                                return {
+                                    subject: s.code,
+                                    fullSubject: s.name,
+                                    [t1Label]: Math.round(pct1),
+                                    [t2Label]: Math.round(pct2),
+                                    raw1: v1 || 'N/A',
+                                    raw2: m2Text
+                                };
+                            });
+
+                            return (
+                                <>
+                                    <div style={{ width: '100%', height: 350, marginBottom: 20 }}>
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
+                                                <PolarGrid stroke="var(--border)" />
+                                                <PolarAngleAxis dataKey="subject" tick={{ fill: 'var(--text)', fontSize: 12, fontWeight: 600 }} />
+                                                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'var(--text-light)', fontSize: 10 }} />
+                                                <Radar name={t1Label} dataKey={t1Label} stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.5} strokeWidth={2} />
+                                                <Radar name={t2Label} dataKey={t2Label} stroke="var(--accent)" fill="var(--accent)" fillOpacity={0.5} strokeWidth={2} />
+                                                <Tooltip formatter={(value) => `${value}%`} />
+                                                <Legend wrapperStyle={{ paddingTop: 20 }} />
+                                            </RadarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    
+                                    <div className="section-title" style={{ fontSize: 14 }}>Raw Marks Comparison</div>
+                                    <table className="marks-table" style={{ width: '100%', fontSize: 13 }}>
+                                        <thead>
+                                            <tr>
+                                                <th style={{ textAlign: 'left' }}>Subject</th>
+                                                <th>{t1Label} ({customMax})</th>
+                                                <th>{t2Label} ({t2Max})</th>
+                                                <th>Trend</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {radarData.map(d => {
+                                                const diff = d[t2Label] - d[t1Label];
+                                                let trend = '—';
+                                                let tCol = 'var(--text-muted)';
+                                                if (d[t1Label] > 0 || d[t2Label] > 0) {
+                                                    if (diff > 0) { trend = `▲ +${diff}%`; tCol = 'var(--success)'; }
+                                                    else if (diff < 0) { trend = `▼ ${Math.abs(diff)}%`; tCol = 'var(--danger)'; }
+                                                    else { trend = '▬ 0%'; tCol = 'var(--warning)'; }
+                                                }
+                                                return (
+                                                    <tr key={d.subject}>
+                                                        <td style={{ textAlign: 'left', paddingLeft: 12 }}><strong>{d.subject}</strong> - {d.fullSubject}</td>
+                                                        <td>{d.raw1}</td>
+                                                        <td>{d.raw2}</td>
+                                                        <td style={{ color: tCol, fontWeight: 700 }}>{trend}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </>
+                            );
+                        })()}
+                    </div>
+                </div>
+            )}
             {toast && <Toast {...toast} onClose={() => setToast(null)} />}
         </div>
     )
