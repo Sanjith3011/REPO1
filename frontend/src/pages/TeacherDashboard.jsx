@@ -518,13 +518,14 @@ export default function TeacherDashboard() {
                     const isAbsent = val === 'AB'
                     
                     let finalMark = null
-                    if (!isAbsent && val !== '') {
+                    if (!isAbsent && val !== null && val !== undefined && val !== '') {
                         const num = parseFloat(val)
-                        // Scale back to standard max before submitting
-                        // Formula: Db Mark = (Custom Mark / Custom Max) * Standard Max
-                        let dbScaled = (num / customMax) * standardMax
-                        dbScaled = Math.round(dbScaled * 10) / 10
-                        finalMark = dbScaled
+                        if (!isNaN(num)) {
+                            // Scale back to standard max before submitting
+                            let dbScaled = (num / customMax) * standardMax
+                            dbScaled = Math.round(dbScaled * 10) / 10
+                            finalMark = dbScaled
+                        }
                     }
                     
                     payload.push({
@@ -1007,6 +1008,9 @@ export default function TeacherDashboard() {
                                                     className="selectable-row"
                                                     tabIndex={0}
                                                     onKeyDown={(e) => {
+                                                        // Only trigger analysis if not focused on an input cell
+                                                        if (e.target.tagName === 'INPUT') return;
+
                                                         if (e.key === 'Enter') {
                                                             e.preventDefault();
                                                             setSelectedComparisonStudent(st);
@@ -1056,6 +1060,7 @@ export default function TeacherDashboard() {
                                                                         onKeyDown={e => {
                                                                             if (e.key === 'Enter') {
                                                                                 e.preventDefault()
+                                                                                e.stopPropagation() // Prevent tr and row-click listener from seeing this
                                                                                 const nextStudent = students[idx + 1]
                                                                                 if (nextStudent) {
                                                                                     const next = document.getElementById(`mark-${nextStudent.student_id}-${subj.id}`)

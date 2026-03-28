@@ -949,6 +949,9 @@ export default function AdminMarksView() {
                                                     className="selectable-row"
                                                     tabIndex={0}
                                                     onKeyDown={(e) => {
+                                                        // Only trigger analysis if not focused on an input cell
+                                                        if (e.target.tagName === 'INPUT') return;
+
                                                         if (e.key === 'Enter') {
                                                             e.preventDefault();
                                                             setSelectedComparisonStudent(st);
