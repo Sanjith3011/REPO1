@@ -816,7 +816,7 @@ export default function AdminMarksView() {
                                                                 <XAxis dataKey="x" hide />
                                                                 <YAxis hide />
                                                                 <Tooltip 
-                                                                    labelFormatter={(v) => `Mark: ${bellData[v]?.x}`}
+                                                                    labelFormatter={(v) => `Mark: ${v}`}
                                                                     formatter={(v) => [`${Math.round(v * 1000) / 1000}`, 'Density']}
                                                                 />
                                                                 <Area 
