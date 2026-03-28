@@ -430,7 +430,7 @@ export default function TeacherDashboard() {
         const s = parseFloat(stdev);
         
         // Generate points from mean-3sd to mean+3sd, clamped to [0, maxMarks]
-        const step = maxMarks / 50;
+        const step = maxMarks / 100;
         for (let x = 0; x <= maxMarks; x += step) {
             const exponent = -Math.pow(x - m, 2) / (2 * Math.pow(s, 2));
             const y = (1 / (s * Math.sqrt(2 * Math.PI))) * Math.exp(exponent);
@@ -855,7 +855,7 @@ export default function TeacherDashboard() {
                                                             <AreaChart data={bellData} onClick={(e) => {
                                                                 if (e && e.activePayload && e.activePayload.length > 0) {
                                                                     const clickedX = e.activePayload[0].payload.x;
-                                                                    const step = customMax / 50;
+                                                                    const step = customMax / 100;
                                                                     const matchedStudents = [];
                                                                     students.forEach(st => {
                                                                         const key = `${st.student_id}_${s.id}`;
@@ -890,7 +890,7 @@ export default function TeacherDashboard() {
                                                                         onClick: (event, payload) => {
                                                                             if (payload && payload.payload) {
                                                                                 const clickedX = payload.payload.x;
-                                                                                const step = customMax / 50;
+                                                                                const step = customMax / 100;
                                                                                 const matchedStudents = [];
                                                                                 students.forEach(st => {
                                                                                     const key = `${st.student_id}_${s.id}`;
