@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import { 
-    LineChart, Line, AreaChart, Area, BarChart, Bar, 
-    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis 
 } from 'recharts'
 
 const ASSESSMENT_LABELS = {
@@ -199,19 +199,7 @@ export default function StudentDashboard() {
         }).filter(Boolean)
     }
 
-    const getSubjectData = () => {
-        const currentType = filter || 'CAT1'
-        const matches = marks.filter(m => m.assessment_type === currentType)
-        return matches.map(m => ({
-            name: m.subject_code,
-            marks: m.marks === 'AB' ? 0 : m.marks,
-            max: m.max_marks,
-            percentage: m.marks === 'AB' ? 0 : Math.round((m.marks / m.max_marks) * 100)
-        }))
-    }
-
     const trendData = getTrendData()
-    const subjectData = getSubjectData()
 
     // Overall stats
     const totalSubjects = marks.length
@@ -296,9 +284,9 @@ export default function StudentDashboard() {
                     </div>
 
                     {/* Graphs Section */}
-                    {!loading && showGraphs && marks.length > 0 && (
-                        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: 20, marginBottom: 30 }}>
-                            <div className="card" style={{ height: 320, padding: '20px 10px 10px' }}>
+                    {!loading && showGraphs && trendData.length > 0 && (
+                        <div className="grid" style={{ gridTemplateColumns: '1fr', marginBottom: 30 }}>
+                            <div className="card" style={{ height: 320, padding: '20px 10px 10px', maxWidth: 800, margin: '0 auto', width: '100%' }}>
                                 <div style={{ fontSize: 13, fontWeight: 700, textAlign: 'center', marginBottom: 15, color: 'var(--text-light)' }}>
                                     PERFORMANCE TREND (%)
                                 </div>
@@ -313,22 +301,6 @@ export default function StudentDashboard() {
                                         />
                                         <Line type="monotone" dataKey="score" stroke="var(--primary)" strokeWidth={3} dot={{ r: 4, fill: 'var(--primary)' }} activeDot={{ r: 6 }} />
                                     </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <div className="card" style={{ height: 320, padding: '20px 10px 10px' }}>
-                                <div style={{ fontSize: 13, fontWeight: 700, textAlign: 'center', marginBottom: 15, color: 'var(--text-light)' }}>
-                                    {filter || 'LATEST'} SUBJECT PERFORMANCE (%)
-                                </div>
-                                <ResponsiveContainer width="100%" height="90%">
-                                    <BarChart data={subjectData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                                        <XAxis dataKey="name" fontSize={10} tick={{ fill: 'var(--text-light)' }} axisLine={false} tickLine={false} />
-                                        <YAxis domain={[0, 100]} fontSize={10} tick={{ fill: 'var(--text-light)' }} axisLine={false} tickLine={false} />
-                                        <Tooltip 
-                                            contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
-                                        />
-                                        <Bar dataKey="percentage" fill="var(--primary)" radius={[4, 4, 0, 0]} barSize={30} />
-                                    </BarChart>
                                 </ResponsiveContainer>
                             </div>
                         </div>
@@ -357,52 +329,87 @@ export default function StudentDashboard() {
                                         <span style={{ fontSize: 20 }}>📅</span> {semTitle}
                                     </h3>
 
-                                    {Object.entries(assessments).map(([atype, subjMarks]) => (
-                                        <div key={atype} style={{ marginBottom: 24 }}>
+                                    {Object.entries(assessments).map(([atype, subjMarks]) => {
+                                        const radarData = subjMarks.map(m => ({
+                                            subject: m.subject_code,
+                                            fullSubject: m.subject_name,
+                                            Score: (m.marks === 'AB' || m.marks === null) ? 0 : Math.round((m.marks / m.max_marks) * 100)
+                                        }));
+                                        const tLabel = ASSESSMENT_LABELS[atype] || atype;
+
+                                        return (
+                                        <div key={atype} style={{ marginBottom: 40 }}>
                                             <div style={{ 
-                                                fontSize: 12, fontWeight: 700, color: 'var(--text-light)', 
-                                                marginBottom: 12, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 8
+                                                fontSize: 15, fontWeight: 800, color: 'var(--primary)', 
+                                                marginBottom: 16, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 8,
+                                                borderBottom: '1px solid var(--border)', paddingBottom: 8
                                             }}>
-                                                <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)' }}></div>
-                                                {ASSESSMENT_LABELS[atype] || atype}
+                                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)' }}></div>
+                                                {tLabel}
                                             </div>
-                                            <div className="student-marks-grid">
-                                                {subjMarks.map((m, i) => {
-                                                    const statusClass = m.status === 'Pass' ? 'pass' : m.status === 'AB' ? 'absent' : 'fail'
-                                                    
-                                                    let displayMarks = m.marks;
-                                                    if (m.marks !== null && m.marks !== 'AB') {
-                                                        if (viewMode === '100') {
-                                                            displayMarks = `${Math.round((m.marks / m.max_marks) * 100)}%`;
-                                                        } else if (viewMode === '60') {
-                                                            displayMarks = (m.marks / m.max_marks * 60).toFixed(1);
-                                                        }
-                                                    }
-                                                    
-                                                    return (
-                                                        <div key={i} className={`subject-card ${statusClass}`} style={{ transition: 'all 0.3s ease' }}>
-                                                            <div className="sub-code">{m.subject_code}</div>
-                                                            <div className="sub-name">{m.subject_name}</div>
-                                                            <div className="sub-marks" style={{ color: statusClass === 'fail' ? 'var(--danger)' : 'inherit' }}>
-                                                                {m.marks !== null ? displayMarks : 'AB'}
-                                                            </div>
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                                                                <div className="sub-max" style={{ fontSize: 10 }}>
-                                                                    {viewMode === 'raw' 
-                                                                        ? `Max: ${m.max_marks} | Pass: ${m.max_marks * 0.5}`
-                                                                        : `Raw: ${m.marks}/${m.max_marks}`
-                                                                    }
-                                                                </div>
-                                                                <span className={`badge badge-${statusClass}`} style={{ fontSize: 9, padding: '2px 8px' }}>
-                                                                    {m.status}
-                                                                </span>
-                                                            </div>
+                                            
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 24, padding: '0 8px' }}>
+                                                {/* Left side: Radar Chart */}
+                                                {(showGraphs && radarData.length > 2) && (
+                                                    <div style={{ flex: '1 1 300px', maxWidth: 450, background: '#fff', borderRadius: 12, border: '1px solid var(--border)', padding: '20px 0', display: 'flex', flexDirection: 'column' }}>
+                                                        <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-light)', textAlign: 'center', marginBottom: 10, letterSpacing: 1 }}>
+                                                            PERFORMANCE FOOTPRINT
                                                         </div>
-                                                    )
-                                                })}
+                                                        <div style={{ width: '100%', height: 260 }}>
+                                                            <ResponsiveContainer width="100%" height="100%">
+                                                                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                                                                    <PolarGrid stroke="var(--border)" />
+                                                                    <PolarAngleAxis dataKey="subject" tick={{ fill: 'var(--text)', fontSize: 11, fontWeight: 600 }} />
+                                                                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: 'var(--text-light)', fontSize: 10 }} />
+                                                                    <Radar name="Score" dataKey="Score" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.4} strokeWidth={2} />
+                                                                    <Tooltip formatter={(value) => `${value}%`} />
+                                                                </RadarChart>
+                                                            </ResponsiveContainer>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Right side: Detailed Cards Grid */}
+                                                <div style={{ flex: '2 1 400px' }}>
+                                                    <div className="student-marks-grid">
+                                                        {subjMarks.map((m, i) => {
+                                                            const statusClass = m.status === 'Pass' ? 'pass' : m.status === 'AB' ? 'absent' : 'fail'
+                                                            
+                                                            let displayMarks = m.marks;
+                                                            if (m.marks !== null && m.marks !== 'AB') {
+                                                                if (viewMode === '100') {
+                                                                    displayMarks = `${Math.round((m.marks / m.max_marks) * 100)}%`;
+                                                                } else if (viewMode === '60') {
+                                                                    displayMarks = (m.marks / m.max_marks * 60).toFixed(1);
+                                                                }
+                                                            }
+                                                            
+                                                            return (
+                                                                <div key={i} className={`subject-card ${statusClass}`} style={{ transition: 'all 0.3s ease' }}>
+                                                                    <div className="sub-code">{m.subject_code}</div>
+                                                                    <div className="sub-name">{m.subject_name}</div>
+                                                                    <div className="sub-marks" style={{ color: statusClass === 'fail' ? 'var(--danger)' : 'inherit' }}>
+                                                                        {m.marks !== null ? displayMarks : 'AB'}
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                                                                        <div className="sub-max" style={{ fontSize: 10 }}>
+                                                                            {viewMode === 'raw' 
+                                                                                ? `Max: ${m.max_marks} | Pass: ${m.max_marks * 0.5}`
+                                                                                : `Raw: ${m.marks}/${m.max_marks}`
+                                                                            }
+                                                                        </div>
+                                                                        <span className={`badge badge-${statusClass}`} style={{ fontSize: 9, padding: '2px 8px' }}>
+                                                                            {m.status}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
                             ))}
                         </div>
