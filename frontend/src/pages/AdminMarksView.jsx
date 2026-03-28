@@ -826,6 +826,28 @@ export default function AdminMarksView() {
                                                                     fill="var(--primary)" 
                                                                     fillOpacity={0.2} 
                                                                     strokeWidth={2}
+                                                                    activeDot={{
+                                                                        cursor: 'pointer',
+                                                                        r: 6,
+                                                                        onClick: (event, payload) => {
+                                                                            if (payload && payload.payload) {
+                                                                                const clickedX = payload.payload.x;
+                                                                                const step = customMax / 50;
+                                                                                const matchedStudents = [];
+                                                                                students.forEach(st => {
+                                                                                    const key = `${st.student_id}_${s.id}`;
+                                                                                    const val = localMarks[key];
+                                                                                    if (val && val !== 'AB' && val !== 'N/A') {
+                                                                                        const mark = parseFloat(val);
+                                                                                        if (!isNaN(mark) && Math.abs(mark - clickedX) <= step / 2) {
+                                                                                            matchedStudents.push({ name: st.name, roll_no: st.roll_no, mark: mark });
+                                                                                        }
+                                                                                    }
+                                                                                });
+                                                                                setSelectedGraphPoint({ subjectId: s.id, subjectCode: s.code, markX: clickedX, students: matchedStudents });
+                                                                            }
+                                                                        }
+                                                                    }}
                                                                 />
                                                             </AreaChart>
                                                         </ResponsiveContainer>
