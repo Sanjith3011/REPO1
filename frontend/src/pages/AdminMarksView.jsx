@@ -944,7 +944,28 @@ export default function AdminMarksView() {
                                         {students.map((st, idx) => {
                                             const stats = getStudentStats(st.student_id)
                                             return (
-                                                <tr key={st.student_id} onClick={() => setSelectedComparisonStudent(st)} style={{ cursor: 'pointer' }} title="Click to view student analysis">
+                                                <tr 
+                                                    key={st.student_id} 
+                                                    className="selectable-row"
+                                                    tabIndex={0}
+                                                    onClick={() => setSelectedComparisonStudent(st)} 
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            setSelectedComparisonStudent(st);
+                                                        } else if (e.key === 'ArrowDown') {
+                                                            e.preventDefault();
+                                                            const nextRow = e.currentTarget.nextElementSibling;
+                                                            if (nextRow && nextRow.classList.contains('selectable-row')) nextRow.focus();
+                                                        } else if (e.key === 'ArrowUp') {
+                                                            e.preventDefault();
+                                                            const prevRow = e.currentTarget.previousElementSibling;
+                                                            if (prevRow && prevRow.classList.contains('selectable-row')) prevRow.focus();
+                                                        }
+                                                    }}
+                                                    style={{ cursor: 'pointer' }} 
+                                                    title="Click to view student analysis"
+                                                >
                                                     <td>{idx + 1}</td>
                                                     <td style={{ textAlign: 'left', paddingLeft: 12, fontWeight: 600 }}>{st.roll_no}</td>
                                                     <td style={{ textAlign: 'left', paddingLeft: 12 }}>{st.name}</td>

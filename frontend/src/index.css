@@ -823,3 +823,14 @@ select.form-control {
 .empty-state p {
   font-size: 16px;
 }
+
+/* ── Keyboard Navigation ── */
+.selectable-row:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  background-color: rgba(37, 99, 235, 0.05);
+}
+
+.selectable-row:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
