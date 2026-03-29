@@ -167,7 +167,11 @@ export default function StudentDashboard() {
     useEffect(() => {
         api.get('/student/marks/')
             .then(({ data }) => {
-                setMarks(data.marks || [])
+                // Strict front-end failsafe: drop any "ghost" marks that have no value and aren't marked absent
+                const cleanMarks = (data.marks || []).filter(
+                    m => m.is_absent || (m.marks !== null && m.marks !== undefined && m.marks !== '')
+                );
+                setMarks(cleanMarks)
                 setStudent(data.student)
             })
             .catch(() => { })

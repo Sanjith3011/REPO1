@@ -612,37 +612,56 @@ def marks_save(request):
     if not isinstance(data, list):
         return Response({'error': 'Expected a list of mark entries'}, status=400)
 
-    with transaction.atomic():
-        for entry in data:
-            student_id = entry.get('student_id')
-            subject_id = entry.get('subject_id')
-            assessment_type = entry.get('assessment_type')
-            is_absent = entry.get('is_absent', False)
-            marks_value = entry.get('marks', None)
+    try:
+        with transaction.atomic():
+            for entry in data:
+                student_id = entry.get('student_id')
+                subject_id = entry.get('subject_id')
+                assessment_type = entry.get('assessment_type')
+                is_absent = entry.get('is_absent', False)
+                marks_value = entry.get('marks', None)
 
-            if not all([student_id, subject_id, assessment_type]):
-                continue
-                
-            # Verify teacher is authorized to save this subject's marks
-            try:
-                subject = Subject.objects.get(id=subject_id)
-                if subject.teacher != request.user and request.user.role != 'admin':
-                    continue # unauthorized to edit this
-            except Subject.DoesNotExist:
-                continue
+                if not all([student_id, subject_id, assessment_type]):
+                    continue
+                    
+                # Verify teacher is authorized to save this subject's marks
+                try:
+                    subject = Subject.objects.get(id=subject_id)
+                    if subject.teacher != request.user and request.user.role != 'admin':
+                        continue # unauthorized to edit this
+                except Subject.DoesNotExist:
+                    continue
 
-            Mark.objects.update_or_create(
-                student_id=student_id,
-                subject_id=subject_id,
-                assessment_type=assessment_type,
-                defaults={
-                    'marks': None if is_absent else marks_value,
-                    'is_absent': is_absent,
-                    'entered_by': request.user,
-                }
-            )
+                # Treat all variations of empty strings or explicit None as a cleared mark
+                effective_marks = None
+                if marks_value is not None and str(marks_value).strip() != "":
+                    try:
+                        effective_marks = float(marks_value)
+                    except (ValueError, TypeError):
+                        effective_marks = None
 
-    return Response({'status': 'saved'})
+                if is_absent is False and effective_marks is None:
+                    # The teacher explicitly cleared this cell. We should delete any existing record if present.
+                    Mark.objects.filter(
+                        student_id=student_id,
+                        subject_id=subject_id,
+                        assessment_type=assessment_type
+                    ).delete()
+                else:
+                    Mark.objects.update_or_create(
+                        student_id=student_id,
+                        subject_id=subject_id,
+                        assessment_type=assessment_type,
+                        defaults={
+                            'marks': None if is_absent else effective_marks,
+                            'is_absent': is_absent,
+                            'entered_by': request.user,
+                        }
+                    )
+        return Response({'status': 'saved'})
+    except Exception as e:
+        print(f"Error in marks_save: {str(e)}")
+        return Response({'error': str(e)}, status=500)
 
 
 # ──────────────────────────────
@@ -980,8 +999,20 @@ def student_own_marks(request):
     
     # Sort by year (descending), then semester (descending), then subject code
     for m in marks_qs.order_by('-student__year', '-subject__semester', 'subject__code'):
+        # Safety: If a ghost record exists with No Marks and Not Absent, skip it entirely
+        # This makes the card disappear from the student's timeline.
+        if m.marks is None and not m.is_absent:
+            continue
+
         max_m = 30 if m.assessment_type.startswith('CT') else 100
         pass_threshold = max_m * 0.5
+        
+        display_marks = 'AB' if m.is_absent else m.marks
+        if m.is_absent:
+            status_val = 'AB'
+        else:
+            status_val = 'Pass' if m.marks >= pass_threshold else 'Fail'
+
         result.append({
             'subject_id': m.subject.id,
             'subject_code': m.subject.code,
@@ -990,10 +1021,10 @@ def student_own_marks(request):
             'semester': m.subject.semester,
             'semester_label': SEM_MAP.get(m.subject.semester, f'Sem {m.subject.semester}'),
             'assessment_type': m.assessment_type,
-            'marks': 'AB' if m.is_absent else m.marks,
+            'marks': display_marks,
             'max_marks': max_m,
             'is_absent': m.is_absent,
-            'status': 'AB' if m.is_absent else ('Pass' if (m.marks is not None and m.marks >= pass_threshold) else 'Fail'),
+            'status': status_val,
         })
 
     return Response({
