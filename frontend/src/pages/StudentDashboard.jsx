@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import api from '../api/axios'
 import { 
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
     Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis 
 } from 'recharts'
 
@@ -163,6 +163,7 @@ export default function StudentDashboard() {
     const [filter, setFilter] = useState('')
     const [viewMode, setViewMode] = useState('raw') // 'raw', '100', '60'
     const [showGraphs, setShowGraphs] = useState(true)
+    const [trendSemester, setTrendSemester] = useState('latest')
 
     useEffect(() => {
         api.get('/student/marks/')
@@ -192,18 +193,40 @@ export default function StudentDashboard() {
 
     const uniqueTypes = [...new Set(marks.map(m => m.assessment_type))]
 
+    // Semester analysis
+    const availableSemesters = [...new Set(marks.map(m => m.semester))].filter(Boolean).sort((a,b) => b - a)
+    const activeTrendSemester = trendSemester === 'latest' ? (availableSemesters[0] || 'All') : trendSemester
+
     // Graph Data Calculations
     const getTrendData = () => {
         const types = ['CT1', 'CAT1', 'CT2', 'CAT2', 'CT3']
         return types.map(type => {
-            const matches = marks.filter(m => m.assessment_type === type && m.marks !== null && !m.is_absent)
-            if (matches.length === 0) return null
-            const avg = matches.reduce((acc, curr) => acc + (curr.marks / curr.max_marks * 100), 0) / matches.length
-            return { name: ASSESSMENT_LABELS[type] || type, score: Math.round(avg) }
+            const result = { name: ASSESSMENT_LABELS[type] || type }
+            
+            if (activeTrendSemester === 'All') {
+                // Multi-line points
+                availableSemesters.forEach(sem => {
+                    const matches = marks.filter(m => m.assessment_type === type && m.semester === sem && m.marks !== null && !m.is_absent)
+                    if (matches.length > 0) {
+                        const avg = matches.reduce((acc, curr) => acc + (curr.marks / curr.max_marks * 100), 0) / matches.length
+                        result[`Sem ${sem}`] = Math.round(avg)
+                    }
+                })
+            } else {
+                // Single-line points
+                const matches = marks.filter(m => m.assessment_type === type && m.semester === activeTrendSemester && m.marks !== null && !m.is_absent)
+                if (matches.length > 0) {
+                    const avg = matches.reduce((acc, curr) => acc + (curr.marks / curr.max_marks * 100), 0) / matches.length
+                    result['Score'] = Math.round(avg)
+                }
+            }
+            // Include only if we actually found tests
+            return Object.keys(result).length > 1 ? result : null
         }).filter(Boolean)
     }
 
     const trendData = getTrendData()
+    const GRAPH_COLORS = ['var(--primary)', '#ff9800', '#4caf50', '#f44336', '#9c27b0', '#00bcd4']
 
     // Overall stats
     const totalSubjects = marks.length
@@ -290,20 +313,57 @@ export default function StudentDashboard() {
                     {/* Graphs Section */}
                     {!loading && showGraphs && trendData.length > 0 && (
                         <div className="grid" style={{ gridTemplateColumns: '1fr', marginBottom: 30 }}>
-                            <div className="card" style={{ height: 320, padding: '20px 10px 10px', maxWidth: 800, margin: '0 auto', width: '100%' }}>
-                                <div style={{ fontSize: 13, fontWeight: 700, textAlign: 'center', marginBottom: 15, color: 'var(--text-light)' }}>
-                                    PERFORMANCE TREND (%)
+                            <div className="card" style={{ height: 360, padding: '20px 20px 10px', maxWidth: 800, margin: '0 auto', width: '100%' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-light)' }}>
+                                        PERFORMANCE TREND (%)
+                                    </div>
+                                    <select 
+                                        className="form-control"
+                                        style={{ width: 'auto', padding: '4px 12px', fontSize: 12, height: 30, borderRadius: 6, border: '1px solid var(--border)' }}
+                                        value={trendSemester}
+                                        onChange={e => setTrendSemester(e.target.value === 'All' ? 'All' : (e.target.value === 'latest' ? 'latest' : Number(e.target.value)))}
+                                    >
+                                        <option value="latest">Latest Semester</option>
+                                        <option value="All">Compare All Semesters</option>
+                                        {availableSemesters.map(sem => (
+                                            <option key={sem} value={sem}>Semester {sem}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <ResponsiveContainer width="100%" height="90%">
-                                    <LineChart data={trendData}>
+                                    <LineChart data={trendData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
                                         <XAxis dataKey="name" fontSize={10} tick={{ fill: 'var(--text-light)' }} axisLine={false} tickLine={false} />
                                         <YAxis domain={[0, 100]} fontSize={10} tick={{ fill: 'var(--text-light)' }} axisLine={false} tickLine={false} />
                                         <Tooltip 
                                             contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
-                                            cursor={{ stroke: 'var(--primary)', strokeWidth: 1 }}
+                                            cursor={{ stroke: 'rgba(0,0,0,0.1)', strokeWidth: 1 }}
                                         />
-                                        <Line type="monotone" dataKey="score" stroke="var(--primary)" strokeWidth={3} dot={{ r: 4, fill: 'var(--primary)' }} activeDot={{ r: 6 }} />
+                                        {activeTrendSemester === 'All' && <Legend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />}
+                                        
+                                        {activeTrendSemester === 'All' ? availableSemesters.map((sem, idx) => (
+                                            <Line 
+                                                key={sem}
+                                                type="monotone" 
+                                                name={`Semester ${sem}`}
+                                                dataKey={`Sem ${sem}`} 
+                                                stroke={GRAPH_COLORS[idx % GRAPH_COLORS.length]} 
+                                                strokeWidth={3} 
+                                                dot={{ r: 4 }} activeDot={{ r: 6 }} 
+                                                connectNulls
+                                            />
+                                        )) : (
+                                            <Line 
+                                                type="monotone" 
+                                                name="Score"
+                                                dataKey="Score" 
+                                                stroke="var(--primary)" 
+                                                strokeWidth={3} 
+                                                dot={{ r: 4, fill: 'var(--primary)' }} activeDot={{ r: 6 }} 
+                                                connectNulls
+                                            />
+                                        )}
                                     </LineChart>
                                 </ResponsiveContainer>
                             </div>
