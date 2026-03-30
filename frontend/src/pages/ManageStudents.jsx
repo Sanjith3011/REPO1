@@ -565,7 +565,7 @@ export default function ManageStudents() {
 
             {/* Admin Change Password Modal */}
             {showAdminPwdModal && (
-                <div className="modal-overlay" style={{ display: 'flex' }} onClick={() => setShowAdminPwdModal(false)}>
+                <div className="modal-overlay" onClick={() => setShowAdminPwdModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 style={{ margin: 0, fontSize: 18, color: 'var(--primary)', fontWeight: 700 }}>
@@ -608,7 +608,7 @@ export default function ManageStudents() {
 
             {/* Add Batch Modal */}
             {showAddBatchModal && (
-                <div className="modal-overlay" style={{ display: 'flex' }} onClick={() => setShowAddBatchModal(false)}>
+                <div className="modal-overlay" onClick={() => setShowAddBatchModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 style={{ margin: 0, fontSize: 18, color: 'var(--primary)', fontWeight: 700 }}>
@@ -663,7 +663,7 @@ export default function ManageStudents() {
 
             {/* Edit Student Modal */}
             {showEditModal && (
-                <div className="modal-overlay" style={{ display: 'flex' }} onClick={() => setShowEditModal(false)}>
+                <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h3 style={{ margin: 0, fontSize: 18, color: 'var(--primary)', fontWeight: 700 }}>
