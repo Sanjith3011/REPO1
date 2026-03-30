@@ -469,6 +469,58 @@ def student_create(request):
     return Response(StudentSerializer(student).data, status=201)
 
 
+@api_view(['PATCH', 'PUT'])
+@permission_classes([IsAdmin])
+def student_update(request, student_id):
+    """Update student details (name and roll_no) - Admin only. 
+    Synchronizes across all year profiles and user account.
+    """
+    try:
+        student = Student.objects.get(id=student_id)
+    except Student.DoesNotExist:
+        return Response({'error': 'Student not found'}, status=404)
+
+    old_roll_no = student.roll_no
+    new_roll_no = request.data.get('roll_no', old_roll_no).strip()
+    new_name = request.data.get('name', student.name).strip()
+
+    if not new_roll_no or not new_name:
+        return Response({'error': 'Roll No and Name cannot be empty'}, status=400)
+
+    # If roll_no changed, check for global uniqueness to avoid conflicts
+    if new_roll_no != old_roll_no:
+        if Student.objects.filter(roll_no=new_roll_no, year=student.year).exists():
+             return Response({'error': f'Another student with roll no {new_roll_no} already exists for Year {student.year}'}, status=400)
+
+    try:
+        with transaction.atomic():
+            # Update the specific student record
+            student.name = new_name
+            student.roll_no = new_roll_no
+            student.save()
+
+            # Synchronize with other year profiles if roll_no changed
+            if new_roll_no != old_roll_no:
+                Student.objects.filter(roll_no=old_roll_no).update(roll_no=new_roll_no, name=new_name)
+                # Update associate user
+                user = CustomUser.objects.filter(username=old_roll_no, role='student').first()
+                if user:
+                    user.username = new_roll_no
+                    user.first_name = new_name
+                    user.save()
+            else:
+                # Just update name for all profiles if only name changed
+                Student.objects.filter(roll_no=old_roll_no).update(name=new_name)
+                user = CustomUser.objects.filter(username=old_roll_no, role='student').first()
+                if user:
+                    user.first_name = new_name
+                    user.save()
+
+        return Response(StudentSerializer(student).data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+
 @api_view(['DELETE'])
 @permission_classes([IsAdmin])
 def student_delete(request, student_id):

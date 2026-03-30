@@ -35,6 +35,7 @@ urlpatterns = [
     path('students/create/', views.student_create, name='student_create'),
     path('students/bulk-delete/', views.student_bulk_delete, name='student_bulk_delete'),
     path('students/<int:student_id>/delete/', views.student_delete, name='student_delete'),
+    path('students/<int:student_id>/update/', views.student_update, name='student_update'),
 
     # Marks
     path('marks/', views.marks_list, name='marks_list'),

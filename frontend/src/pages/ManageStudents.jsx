@@ -63,6 +63,13 @@ export default function ManageStudents() {
     const [bulkText, setBulkText] = useState('')
     const [bulkMode, setBulkMode] = useState(false)
 
+    // Edit logic
+    const [showEditModal, setShowEditModal] = useState(false)
+    const [editStudent, setEditStudent] = useState(null)
+    const [editRollNo, setEditRollNo] = useState('')
+    const [editName, setEditName] = useState('')
+    const [editLoading, setEditLoading] = useState(false)
+
     const showToast = (msg, type = 'success') => setToast({ msg, type })
 
     // Load departments on mount
@@ -227,6 +234,42 @@ export default function ManageStudents() {
             showToast(`${st.name} deleted`)
         } catch {
             showToast('Failed to delete student', 'error')
+        }
+    }
+
+    const handleEditClick = (st) => {
+        setEditStudent(st)
+        setEditRollNo(st.roll_no)
+        setEditName(st.name)
+        setShowEditModal(true)
+    }
+
+    const handleUpdateStudent = async (e) => {
+        e.preventDefault()
+        if (!editRollNo.trim() || !editName.trim()) { showToast('Roll No and Name are required', 'error'); return }
+        setEditLoading(true)
+        try {
+            const { data } = await api.put(`/students/${editStudent.id}/update/`, {
+                roll_no: editRollNo.trim(),
+                name: editName.trim()
+            })
+            
+            // If the roll number changed, we might have updated multiple records in the backend.
+            // For simplicity in the UI, we just update the students we have in the current list
+            // if their old_roll_no matches or if it's the exact student we edited.
+            setStudents(prev => prev.map(s => {
+                if (s.id === editStudent.id || (editRollNo.trim() !== editStudent.roll_no && s.roll_no === editStudent.roll_no)) {
+                    return { ...s, roll_no: editRollNo.trim(), name: editName.trim() }
+                }
+                return s
+            }))
+            
+            showToast('Student details updated successfully!')
+            setShowEditModal(false)
+        } catch (err) {
+            showToast(err.response?.data?.error || 'Failed to update student', 'error')
+        } finally {
+            setEditLoading(false)
         }
     }
 
@@ -492,10 +535,16 @@ export default function ManageStudents() {
                                             <td>{st.name}</td>
                                             <td><span className="role-badge">{st.year}</span></td>
                                             <td style={{ textAlign: 'center' }}>
-                                                <button className="btn btn-outline" onClick={() => handleDelete(st)}
-                                                    style={{ color: 'var(--danger)', borderColor: 'var(--danger)', padding: '4px 14px', fontSize: 12 }}>
-                                                    Delete
-                                                </button>
+                                                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                                                    <button className="btn btn-outline" onClick={() => handleEditClick(st)}
+                                                        style={{ color: 'var(--primary)', borderColor: 'var(--primary)', padding: '4px 14px', fontSize: 12 }}>
+                                                        Edit
+                                                    </button>
+                                                    <button className="btn btn-outline" onClick={() => handleDelete(st)}
+                                                        style={{ color: 'var(--danger)', borderColor: 'var(--danger)', padding: '4px 14px', fontSize: 12 }}>
+                                                        Delete
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -604,6 +653,51 @@ export default function ManageStudents() {
                                     <button type="button" className="btn btn-outline" onClick={() => setShowAddBatchModal(false)}>Cancel</button>
                                     <button type="submit" className="btn btn-primary" disabled={addBatchLoading}>
                                         {addBatchLoading ? 'Creating...' : 'Create Batch'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Student Modal */}
+            {showEditModal && (
+                <div className="modal-overlay" style={{ display: 'flex' }} onClick={() => setShowEditModal(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 style={{ margin: 0, fontSize: 18, color: 'var(--primary)', fontWeight: 700 }}>
+                                Edit Student Details
+                            </h3>
+                            <button className="btn" style={{ background: 'transparent', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text)' }} onClick={() => setShowEditModal(false)}>×</button>
+                        </div>
+                        <div className="modal-body" style={{ padding: '0 20px 20px' }}>
+                            <p style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--text-light)' }}>
+                                Updating details for student in <b>Year {editStudent?.year}</b>.
+                            </p>
+                            <form onSubmit={handleUpdateStudent}>
+                                <div className="form-group">
+                                    <label>REGISTER NO / ROLL NO</label>
+                                    <input 
+                                        type="text" 
+                                        value={editRollNo} 
+                                        onChange={e => setEditRollNo(e.target.value)} 
+                                        required 
+                                    />
+                                </div>
+                                <div className="form-group" style={{ marginTop: 16 }}>
+                                    <label>STUDENT NAME</label>
+                                    <input 
+                                        type="text" 
+                                        value={editName} 
+                                        onChange={e => setEditName(e.target.value)} 
+                                        required 
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', marginTop: 24 }}>
+                                    <button type="button" className="btn btn-outline" onClick={() => setShowEditModal(false)}>Cancel</button>
+                                    <button type="submit" className="btn btn-primary" disabled={editLoading}>
+                                        {editLoading ? 'Updating...' : 'Save Changes'}
                                     </button>
                                 </div>
                             </form>
